@@ -89,6 +89,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); heig
 .stat-value.orange { color:var(--warning); }
 
 .section-title { font-size:11px;letter-spacing:2px;color:var(--text2);text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border); }
+.ticket-form { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
 
 /* TICKET */
 .ticket-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.15s; }
@@ -227,6 +228,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); heig
         <button class="btn" id="cc-btn" onclick="showCycleCountStart()" disabled style="font-size:11px;background:var(--surface2);border-color:var(--border)">🔢 Cycle Counts</button>
         <button class="btn" id="edi-btn" onclick="showEDIImportFile()" disabled style="font-size:11px;background:var(--surface2);border-color:var(--border)">📄 EDI Import File</button>
         <button class="btn" id="nexus-btn" onclick="showNexusReceipt()" style="font-size:11px;background:var(--surface2);border-color:var(--border)">Nexus Inbound</button>
+        <button class="btn" id="elx-edi-btn" onclick="showElxEdi()" style="font-size:11px;background:var(--surface2);border-color:var(--border)">🚚 EDI · Electrolit Inbound</button>
         <button class="btn" id="putaway-btn" onclick="showPendingPutAway()" disabled style="font-size:11px;background:var(--surface2);border-color:var(--border)">📥 Pending Put Away</button>
         <button class="btn" id="lastputaway-btn" onclick="showLastPutAway()" disabled style="font-size:11px;background:var(--surface2);border-color:var(--border)">📋 Last Put Away</button>
         <button class="btn" id="staged-btn" onclick="showStagedInventory()" disabled style="font-size:11px;background:var(--surface2);border-color:var(--border)">🗂 Staged Inventory</button>
@@ -339,7 +341,33 @@ function reResolveBUs() {
 const GHOST_LOCATION = '23-GHOST-00';
 const CYCLE_COUNT_PATTERN = 'CYC_CNT'; // locations containing CYC_CNT are Cycle Count
 const FIFO_ACCOUNTS = ['COVINGTON XDK','CBM','NORCROSS XDK','BLANK'];
-const FEFO_ACCOUNTS = ['SCI GAMES','HBH','CONWAY','LANET'];
+const FEFO_ACCOUNTS = ['SCI GAMES','HBH','CONWAY','LANET','ELECTROLIT'];
+// ─── ELECTROLIT (beverages, now received at 6021 from the 6049/Fulton program) ───
+// Electrolit arrives in the SAME WMS inventory file as paper rolls, tagged by the Customer
+// column. It is counted in PALLETS and picked FEFO (earliest Expiration Date first) — both
+// already supported generically here; Electrolit just registers as a FEFO account (above)
+// and a pallet-UOM customer (unitNoun). Everything is gated on _isElectrolitRoll so existing
+// 6021 customers are unaffected.
+const ELX_MASTER = {"4021579": ["ELECTROLIT GRAPE 21 OZ", 1590.0, 1624.0, 85], "4022068": ["ELECTROLIT STRAWBERRY 21 OZ", 1590.0, 1624.0, 85], "4022069": ["ELECTROLIT COCONUT 21 OZ", 1590.0, 1624.0, 85], "4022070": ["ELECTROLIT ORANGE 21 OZ", 1590.0, 1624.0, 85], "4022071": ["ELECTROLIT LEMON-LIME 21 OZ", 1590.0, 1624.0, 85], "4041942": ["ELECTROLIT STRAWBERRY-KIWI 21 OZ", 1590.0, 1624.0, 85], "4049689": ["ELECTROLIT PASSION FRUIT 21 OZ", 1590.0, 1624.0, 85], "4049691": ["ELECTROLIT BERRY BLISS 21 OZ", 1590.0, 1624.0, 85], "4049692": ["ELECTROLIT FRUIT PUNCH 21 OZ", 1590.0, 1624.0, 85], "4049883": ["ELECTROLIT HIBISCUS/JAMAICA 21 OZ", 1590.0, 1624.0, 85], "4052169": ["ELECTROLIT ZERO FRUIT PUNCH SPLASH 21 OZ", 1590.0, 1624.0, 85], "4052173": ["ELECTROLIT ZERO LEMON BREEZE 21 OZ", 1590.0, 1624.0, 85], "4052207": ["ELECTROLIT GUAVA 21 OZ", 1590.0, 1624.0, 85], "4053194": ["ELECTROLIT ZERO BERRY BLAST 21 OZ", 1590.0, 1624.0, 85], "4054957": ["ELECTROLIT CUCUMBER-LIME 21 OZ", 1590.0, 1624.0, 85], "4057580": ["ELECTROLIT ZERO BLUE RASPBERRY 21 OZ", 1590.0, 1624.0, 85], "4057581": ["ELECTROLIT ZERO STRAWBERRY-BANANA 21 OZ", 1590.0, 1624.0, 85], "4058130": ["ELECTROLIT BLUE RASPBERRY 21 OZ", 1590.0, 1624.0, 85], "4058492": ["ELECTROLIT MANGO 21 OZ", 1590.0, 1624.0, 85], "4059481": ["ELECTROLIT GREEN APPLE 21 OZ", 1590.0, 1624.0, 85], "4059484": ["ELECTROLIT WATERMELON-LIME 21 OZ", 1590.0, 1624.0, 85], "4059485": ["ELECTROLIT MIX STRAW-KIWI 8P, 0.53 Oz", 1590.0, 1624.0, 85], "4058730": ["ELECTROLIT MIX STRAW-KIWI 8P, 0.53 Oz", 476.4, 520.4, 60], "4058731": ["ELECTROLIT MIX GRAPE 8P, 0.53 Oz", 476.4, 520.4, 60], "4058732": ["ELECTROLIT MIX FRUIT PUNCH 8P, 0.53 Oz", 476.4, 520.4, 60], "4058733": ["ELECTROLIT MIX VARIETY SK/GR/FP 8P, 0.53", 476.4, 520.4, 60], "4059564": ["ELECTROLIT MIX STRAW-KIWI 6P, 0.53 Oz", 372.0, 401.24, 120], "4059565": ["ELECTROLIT MIX GRAPE 6P, 0.53 Oz", 372.0, 401.24, 120], "4059566": ["ELECTROLIT MIX FRUIT PUNCH 6P, 0.53 Oz", 372.0, 401.24, 120], "4059567": ["ELECTROLIT MIX VARIETY SK/GR/FP 6P, 0.53", 372.0, 401.24, 120], "4059608": ["ELECTROLIT MIX LEMON-LIME 8P, 0.53 Oz", 476.4, 520.4, 60], "4059609": ["ELECTROLIT MIX LEMON-LIME 6P, 0.53 Oz", 372.0, 401.24, 120], "4060243": ["ELECTROLIT FP/GRAP/STRA-KIW 12 OZ 15 MP", 1904.58, 1951.37, 108], "4065102": ["ELECTROLIT FRUIT PUNCH 12 OZ 6 MP WP", 1540.0, 1580.0, 70], "4065103": ["ELECTROLIT GRAPE 12 OZ 6 MP WP", 1540.0, 1580.0, 70], "4060452": ["ELECTROLIT BLUE RASPBERRY 12 OZ 6 MP", 1540.0, 1580.0, 70], "4060487": ["ELECTROLIT ZERO STRAW-BANANA 12 OZ 6 MP", 1540.0, 1580.0, 70], "4060454": ["ELECTROLIT FRUIT PUNCH 12 OZ 6 MP", 1540.0, 1580.0, 70], "4060455": ["ELECTROLIT GRAPE 12 OZ 6 MP", 1540.0, 1580.0, 70], "4064840": ["ELECTROLIT PINEAPPLE COCONUT 21 OZ", 1590.0, 1624.0, 85], "4064838": ["ELECTROLIT CHERRY ICE 21 OZ", null, null, null]};
+function _elxMaster(sku){ return ELX_MASTER[String(sku==null?'':sku).trim()] || null; }
+function isElectrolitSku(sku){ return !!_elxMaster(sku); }
+// A row is Electrolit if its Customer cell says so (canonicalized to 'Electrolit' at import),
+// or — only when the Customer cell is blank — if its SKU is in the Electrolit master. The
+// blank-customer fallback avoids mis-tagging a tagged IPG/other row that happens to share a code.
+function _isElectrolitRoll(r){
+  if(!r) return false;
+  var c=String(r.customer||'');
+  if(/ELECTROLIT/i.test(c)) return true;
+  if(!c.trim() && isElectrolitSku(r.sku)) return true;
+  return false;
+}
+// Canonicalize the Customer cell at import so Electrolit variants collapse to one name, which
+// drives its FEFO + pallet handling. Every non-Electrolit name passes straight through.
+function canonCustomer(c){
+  var s=(c==null?'':c).toString().trim();
+  if(/ELECTROLIT/i.test(s)) return 'Electrolit';
+  return s;
+}
 
 // Single source of truth for roll status classification (matches Inventory Summary).
 // Priority: PICKED → GHOST → DAMAGED → CYCLE COUNT → AVAILABLE.
@@ -396,6 +424,15 @@ function isReceivingLoc(loc){
   const s = String(loc==null?'':loc).trim().toUpperCase();
   return s.indexOf('RRSTG')>=0 || s.indexOf('TRSTG')>=0;
 }
+// Inventory accuracy (available-stock %) scoped to one customer — used by the by-customer
+// cycle-count report. Mirrors inventoryAccuracyStats but only over that customer's rolls.
+function _ccCustInvAcc(cust){
+  var inv=(state.inventory||[]).filter(function(r){ return (r.customer||'').trim()===cust; });
+  if(!inv.length) return null;
+  var ghost=0,cc=0,total=inv.length;
+  inv.forEach(function(r){ var s=classifyRoll(r); if(s==='GHOST') ghost++; else if(s==='CYCLE COUNT') cc++; });
+  return total>0 ? (total-ghost-cc)/total*100 : null;
+}
 function inventoryAccuracyStats(excludeStaging) {
   // excludeStaging (Cycle Count screens): drop rolls in outbound staging bins ending in -00
   const inv = (state.inventory || []).filter(r => !excludeStaging || !isCCStaging(r.location));
@@ -427,6 +464,8 @@ function unitNoun(ctx) {
   const nexus = isObj ? _isNexusRoll(ctx)
     : (/NEXUS/i.test(cust) || _nexusCustomers().has(cust));
   if (nexus) return 'pallets';
+  const elx = isObj ? _isElectrolitRoll(ctx) : /ELECTROLIT/i.test(cust);
+  if (elx) return 'pallets';
   return /MAXXON/i.test(cust) ? 'skids' : 'rolls';
 }
 function unitNounCap(ctx) { const u = unitNoun(ctx); return u.charAt(0).toUpperCase() + u.slice(1); }
@@ -531,6 +570,7 @@ function ccUnitForLocs(locs) {
   // IPG locations report in the item's UOM (BUND for DuraBubble, cases, etc.)
   if (rows.length && rows.every(r => _rowIsIPG(r))) return unitNounForRows(rows, rows[0] && rows[0].customer);
   if (rows.length && rows.every(r => _isNexusRoll(r))) return 'pallets';
+  if (rows.length && rows.every(r => _isElectrolitRoll(r))) return 'pallets';
   if (rows.length && rows.every(r => unitNoun(r.customer)==='skids')) return 'pallets';
   return 'rolls';
 }
@@ -542,6 +582,7 @@ function ccSessionUnit(session) {
   (session.entries||[]).forEach(e => { if (e && !e.empty) (e.rows||[]).forEach(r => { if (r) allRows.push(r); }); });
   // IPG counts print in the item's UOM, resolved from the SKUs recorded in the count.
   if (allRows.length && allRows.every(r => _rowIsIPG(r))) return unitNounForRows(allRows, allRows[0] && allRows[0].customer);
+  if (allRows.length && allRows.every(r => _isElectrolitRoll(r))) return 'pallets';
   const named = allRows.map(r => r.bu ? resolveBU(r.bu) : '').filter(Boolean);
   if (named.length) return named.every(b => /MAXXON/i.test(b) || /NEXUS/i.test(b)) ? 'pallets' : 'rolls';
   return ccUnitForLocs(session.locations || (session.entries||[]).map(e=>e.loc));
@@ -631,7 +672,7 @@ function setSyncStatus(s) {
 // ─── AUTO-UPDATE ───────────────────────────────────────────
 // Publishes this build to Firebase; when a newer build is published elsewhere, open
 // clients hard-reload to pick it up (like the Dock Scheduler). BUMP APP_BUILD EVERY RELEASE.
-const APP_BUILD = 148;
+const APP_BUILD = 156;
 const VERSION_PATH = '6021/appVersion';
 // A downloaded copy opened as a local file (file://) is a TEST build. The LIVE app is served
 // over http(s). A test build NEVER publishes its version or auto-reloads, so opening it to
@@ -663,6 +704,8 @@ function listenToFirebase() {
   if (!initFirebase()) { setTimeout(listenToFirebase,2000); return; }
   setSyncStatus('connecting');
   _ediListen();   // shared EDI loads
+  try{ _elxEdiRestore(); }catch(e){}
+  _elxEdiListen();   // Electrolit EDI inbound (isolated branch)
   _versionGuard();
 
   // Tickets
@@ -773,6 +816,7 @@ function listenToFirebase() {
   db.ref('6021/domtarSku').on('value', snap => {
     state.domtarSku = snap.val() || {};
     if (state.currentView === 'edi' && typeof showEDIImportFile==='function' && !_ediInputFocused()) showEDIImportFile();
+    if (state.currentView === 'elxedi' && typeof showElxEdi==='function' && !_elxEdiInputFocused()) showElxEdi();
   });
 
   // cycleCount6021 connection loaded on demand
@@ -1371,7 +1415,7 @@ function importInventory(wb, filename, batchMode=false) {
   const incomingCustomers = new Set();
   for (let i=hi+1;i<allRows.length;i++) {
     const r = allRows[i];
-    const cust = (r[custI]||'').toString().trim();
+    const cust = canonCustomer(r[custI]);
     if (cust) incomingCustomers.add(cust);
   }
   // Remove existing rolls for these customers before re-importing
@@ -1413,7 +1457,7 @@ function importInventory(wb, filename, batchMode=false) {
                       ? r[buColI].toString().trim() : '';
     // Priority: BU column (Smurfit) → LEFT(3) of Prod ID2 → LEFT(3) of Prod ID
     let buRaw = (_buCol || _prod2val.substring(0,3) || _prod1val.substring(0,3)).substring(0,3).toUpperCase();
-    const cust = (r[custI]||'').toString().trim();
+    const cust = canonCustomer(r[custI]);
     // Catalyst ONLY: the BU is driven by the Customer column (B), not the Prod ID2 prefix.
     // Catalyst rolls carry many different prefixes (450, 234, 244, 563, 315…) which otherwise
     // split into a dozen look-alike BUs and cause allocation issues. Collapse them into two:
@@ -1729,7 +1773,7 @@ function _poGate(r, poQ){
 }
 
 function showNewTicket() {
-  const customers = [...new Set(state.inventory.map(r=>r.customer).filter(Boolean))].sort();
+  const customers = [...new Set(['Electrolit', ...state.inventory.map(r=>r.customer).filter(Boolean)])].sort();
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('modal-container').innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
@@ -2676,7 +2720,7 @@ function removeSkuLineFromTicket(tid, li) {
 
 function editTicket(id) {
   const t = state.tickets.find(t=>t.id===id); if (!t) return;
-  const customers = [...new Set(state.inventory.map(r=>r.customer).filter(Boolean))].sort();
+  const customers = [...new Set(['Electrolit', ...state.inventory.map(r=>r.customer).filter(Boolean)])].sort();
   const customerNames = new Set(state.inventory.map(r=>r.customer));
   const allBUs = [...new Set(state.inventory.filter(r=>r.bu).map(r=>r.bu))].sort();   // include customer-named BUs (e.g. CATALYST is both a customer and a BU)
 
@@ -8851,7 +8895,7 @@ function saveCycleCount() {
   const id = 'CC-'+new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'}).replace(/\//g,'')+'-'+Date.now().toString().slice(-4);
   const counterName = ((document.getElementById('cc-counter-name')||{}).value||'').trim();
   window._ccCounterName = counterName; // remember for the next count's prefill
-  const session = { id, createdAt:Date.now(), status:'pending', countedBy:state.currentUser?state.currentUser.name:'Unknown', counterName:counterName, locations:window._ccLocations||[], entries, adjustments:[] };
+  const session = { id, createdAt:Date.now(), status:'pending', countedBy:state.currentUser?state.currentUser.name:'Unknown', counterName:counterName, locations:window._ccLocations||[], customers:_ccCustomersForLocs(window._ccLocations||[]), entries, adjustments:[] };
   if (db) db.ref('cycleCount6021/'+id).set(session).catch(()=>{});
   window._ccLastSession = session;
   loadCCHistory();
@@ -8862,6 +8906,15 @@ function saveCycleCount() {
 function ccMonthKey(ts) { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 function ccMonthLabel(key) { const p = key.split('-'); return new Date(+p[0], +p[1]-1, 1).toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
 function loadCCMonth(monthKey) { renderCCMonthList(monthKey); }
+// ── CYCLE COUNT — CUSTOMER TAGGING FOR THE REPORTING LIST ─────────────────────
+// Customers for a set of locations, from current inventory (the same location->customer
+// mapping the 'count by customer' generator uses). Stamped on each saved count.
+function _ccCustomersForLocs(locs){ var set={}, inv=state.inventory||[], want={}; (locs||[]).forEach(function(l){ want[l]=1; }); for(var i=0;i<inv.length;i++){ var r=inv[i]; if(r&&r.location&&want[r.location]){ var c=(r.customer||'').trim(); if(c) set[c]=1; } } return Object.keys(set); }
+// A saved count's customer(s): the stored list if present, else derived from its locations
+// via the current location->customer map (rebuilt by showCycleCountStart).
+function _ccSessionCustomers(s){ if(s && s.customers && s.customers.length) return s.customers; var map=window._ccLocCustomers||{}, set={}; (s&&s.locations||[]).forEach(function(loc){ var c=map[loc]; if(c) Object.keys(c).forEach(function(k){ set[k]=1; }); }); return Object.keys(set); }
+// Pipe-wrapped, lowercased customer tag for a count card's data-cccust attribute.
+function _ccCustAttr(s){ var cs=_ccSessionCustomers(s); return cs.length ? ('|'+cs.map(function(c){return String(c).toLowerCase();}).join('|')+'|').replace(/"/g,'&quot;') : ''; }
 function renderCCMonthList(monthKey) {
   const el = document.getElementById('cc-month-list'); if (!el) return;
   const lbl = document.getElementById('cc-month-label');
@@ -8874,7 +8927,7 @@ function renderCCMonthList(monthKey) {
     const searchStr = (s.id+' '+(s.countedBy||'')+' '+locs.join(' ')).toLowerCase().replace(/"/g,'&quot;');
     const locsDisp = locs.length ? locs.join(', ').replace(/</g,'&lt;') : '';
     return `
-    <div data-ccsearch="${searchStr}" style="padding:9px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;font-size:12px">
+    <div data-ccsearch="${searchStr}" data-cccust="${_ccCustAttr(s)}" style="padding:9px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;font-size:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
         <span style="font-weight:bold;color:var(--accent);cursor:pointer" onclick="viewCCSession('${s.id}')">${s.id}</span>
         ${(!isArchived && isAdmin())?`<button onclick="confirmDeleteSession('${s.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;padding:0">✕</button>`:(isArchived?`<span style="font-size:9px;color:var(--text2);letter-spacing:1px">ARCHIVED</span>`:'')}
@@ -8889,8 +8942,12 @@ function renderCCMonthList(monthKey) {
 // Filter the monthly counts sidebar by session #, counter name, or location code.
 function filterCCMonthList(){
   var q=((document.getElementById('cc-month-search')||{}).value||'').toLowerCase().trim();
+  var cust=((document.getElementById('cc-month-cust')||{}).value||'__all__');
+  var cq=(cust==='__all__')?null:('|'+cust.toLowerCase()+'|');
   document.querySelectorAll('#cc-month-list [data-ccsearch]').forEach(function(card){
-    card.style.display = (!q || card.getAttribute('data-ccsearch').indexOf(q)!==-1) ? '' : 'none';
+    var textOk=(!q || card.getAttribute('data-ccsearch').indexOf(q)!==-1);
+    var custOk=(!cq || (card.getAttribute('data-cccust')||'').indexOf(cq)!==-1);
+    card.style.display = (textOk && custOk) ? '' : 'none';
   });
 }
 
@@ -9255,7 +9312,13 @@ function showCycleCountStart() {
           <div style="font-size:11px;color:var(--text2);letter-spacing:1px;font-weight:bold">COUNTS — <span id="cc-month-label"></span></div>
           <select id="cc-month-select" onchange="loadCCMonth(this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-family:var(--font);font-size:11px;outline:none">${ccMonthOpts}</select>
         </div>
-        <input type="text" id="cc-month-search" oninput="filterCCMonthList()" placeholder="Search counts — session #, counter, or location…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-family:var(--font);font-size:11px;outline:none;margin-bottom:8px">
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input type="text" id="cc-month-search" oninput="filterCCMonthList()" placeholder="Search counts — session #, counter, or location…" style="flex:1;min-width:0;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-family:var(--font);font-size:11px;outline:none">
+          <select id="cc-month-cust" onchange="filterCCMonthList()" title="Show only counts that include this customer" style="flex:1;min-width:0;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-family:var(--font);font-size:11px;outline:none">
+            <option value="__all__">All customers</option>
+            ${(()=>{ const cs=[...new Set(state.inventory.map(r=>(r.customer||'').trim()).filter(Boolean))].sort(); return cs.map(c=>'<option value="'+String(c).replace(/"/g,'&quot;')+'">'+String(c).replace(/</g,'&lt;')+'</option>').join(''); })()}
+          </select>
+        </div>
         <div id="cc-month-list" style="flex:1;min-height:0;overflow-y:auto;padding-right:2px">`;
 
     html += `</div></div></div>`;
@@ -9898,6 +9961,10 @@ function showCCTracker(monthKey) {
           ${monthKeys.map(k=>`<option value="${k}"${k===monthKey?' selected':''}>${ccMonthLabel(k)}${k===curKey?' (current)':''}</option>`).join('')}
         </select>
         <button class="btn" onclick="saveCCInvSnapshot('${monthKey}')" title="Capture the currently loaded inventory's accuracy as ${monthName}'s month-end snapshot" style="font-size:11px">📸 Save Inv Snapshot</button>
+        <select id="cc-tracker-cust" title="Filter the printed report by customer" style="font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font);outline:none">
+          <option value="__all__">All customers</option>
+          ${(()=>{ const cs=[...new Set(state.inventory.map(r=>(r.customer||'').trim()).filter(Boolean))].sort(); return cs.map(c=>'<option value="'+String(c).replace(/"/g,'&quot;')+'">'+String(c).replace(/</g,'&lt;')+'</option>').join(''); })()}
+        </select>
         <button class="btn" onclick="exportCCTrackerReport()" style="font-size:11px;background:var(--accent);color:#fff;border-color:var(--accent)">🖨 Print Report</button>
         <button class="btn" onclick="showCycleCountStart()" style="font-size:11px">← Back to Count</button>
       </div>
@@ -9999,10 +10066,17 @@ function exportCCTrackerReport() {
 
   const pctTxt = n => (isFinite(n) ? Math.round(n) : 0) + '%';
 
+  // Report customer scope (chosen in the tracker toolbar). '__all__' = every customer.
+  const custSel = (document.getElementById('cc-tracker-cust')||{}).value || '__all__';
+  const _filtered = custSel !== '__all__';
+  const _locCust = {}; (state.inventory||[]).forEach(function(r){ if(r&&r.location){ var c=(r.customer||'').trim(); if(c){ (_locCust[r.location]=_locCust[r.location]||{})[c]=1; } } });
+  const locInCust = function(loc){ return !_filtered || !!(_locCust[loc] && _locCust[loc][custSel]); };
+
   // Per-session results (accuracy + variance), mirroring the report screen's math.
   let aggLines = 0, aggAccurate = 0, aggExp = 0, aggAdj = 0, aggNet = 0, aggLocs = 0;
   const sessionRows = (T.sessions || []).map(s => {
-    s = Object.assign({}, s, { entries:(s.entries||[]).filter(e=>!isCCStaging(e.loc)), locations:(s.locations||[]).filter(l=>!isCCStaging(l)) });   // exclude -00 staging bins from report accuracy
+    s = Object.assign({}, s, { entries:(s.entries||[]).filter(e=>!isCCStaging(e.loc) && locInCust(e.loc)), locations:(s.locations||[]).filter(l=>!isCCStaging(l) && locInCust(l)) });   // exclude -00 staging bins + scope to the chosen customer
+    if (_filtered && !(s.locations.length || (s.entries && s.entries.length))) return null;   // nothing for this customer in this count
     const adjs   = s.adjustments || [];
     const getAdj = loc => adjs.find(a => a.loc === loc);
     const entries = s.entries || [];
@@ -10029,18 +10103,23 @@ function exportCCTrackerReport() {
       by: s.counterName || s.countedBy || '', locs, binPct, countPct, net,
       adjusted: (s.adjustments && s.adjustments.length) ? (s.adjustedBy || 'Yes') : '—'
     };
-  });
+  }).filter(Boolean);
   const aggBin   = aggLines > 0 ? (aggAccurate / aggLines * 100) : 100;
   const aggCount = aggExp   > 0 ? Math.max(0, (1 - aggAdj/aggExp) * 100) : 100;
 
+  const _counted = (T.countedLocs||[]).filter(locInCust);
+  const _uncounted = (T.uncountedLocs||[]).filter(locInCust);
+  const _totalLocs = _counted.length + _uncounted.length;
+  const _pct = _totalLocs ? Math.round(_counted.length/_totalLocs*100) : 0;
+  const _invAcc = _filtered ? _ccCustInvAcc(custSel) : T.invAcc;
   const cards = [
-    ['Total Locations', T.totalLocs],
-    ['Counted', T.countedLocs.length],
-    ['Remaining', T.uncountedLocs.length],
-    ['% Complete', T.pct + '%'],
+    ['Total Locations', _totalLocs],
+    ['Counted', _counted.length],
+    ['Remaining', _uncounted.length],
+    ['% Complete', _pct + '%'],
     ['Count Accuracy', pctTxt(aggCount)],
     ['Bin Accuracy', pctTxt(aggBin)],
-    ['Inventory Accuracy', (T.invAcc!=null ? T.invAcc.toFixed(1)+'%' : '—'), 'flex:0 0 auto;margin-left:auto;margin-right:auto;min-width:200px;text-align:center']
+    ['Inventory Accuracy', (_invAcc!=null ? _invAcc.toFixed(1)+'%' : '—'), 'flex:0 0 auto;margin-left:auto;margin-right:auto;min-width:200px;text-align:center']
   ].map(c => '<div class="card" style="'+(c[2]||'')+'"><div class="lbl">'+c[0]+'</div><div class="val">'+c[1]+'</div></div>').join('');
 
   const sessionTable = sessionRows.length
@@ -10071,8 +10150,8 @@ function exportCCTrackerReport() {
       </table>`
     : '<div class="muted" style="padding:10px 0">No cycle counts recorded this month.</div>';
 
-  const uncountedList = T.uncountedLocs.length
-    ? '<div class="loclist">' + T.uncountedLocs.map(l => '<span>'+l+'</span>').join('') + '</div>'
+  const uncountedList = _uncounted.length
+    ? '<div class="loclist">' + _uncounted.map(l => '<span>'+l+'</span>').join('') + '</div>'
     : '<div class="muted" style="padding:10px 0">All locations have been counted. ✔</div>';
 
   const doc = `<!doctype html><html><head><meta charset="utf-8">
@@ -10096,7 +10175,7 @@ function exportCCTrackerReport() {
       .loclist{display:flex;flex-wrap:wrap;gap:4px}
       .loclist span{border:1px solid #ddd;border-radius:4px;padding:2px 7px;font-size:11px}
       .bar{height:12px;background:#e5e5e5;border-radius:6px;overflow:hidden;margin:6px 0 16px}
-      .bar > div{height:100%;background:#1a9e7a;width:${T.pct}%}
+      .bar > div{height:100%;background:#1a9e7a;width:${_pct}%}
       .toolbar{margin-bottom:14px}
       .toolbar button{font:bold 12px Arial;padding:7px 16px;border:none;border-radius:6px;background:#1a9e7a;color:#fff;cursor:pointer}
       @media print{.noprint{display:none}body{margin:.5in}}
@@ -10104,12 +10183,13 @@ function exportCCTrackerReport() {
     <div class="toolbar noprint"><button onclick="window.print()">🖨 Print</button></div>
     <h1>PickFlow 6021 — Cycle Count Report</h1>
     <div class="sub">Greensboro · ${T.monthName} · Generated ${new Date(T.generatedAt).toLocaleString()}</div>
+    ${_filtered ? ('<div class="sub" style="font-weight:bold;color:#1a5276;margin-top:-8px">Customer: '+String(custSel).replace(/</g,'&lt;')+'</div>') : ''}
     <div class="cards">${cards}</div>
     <div class="bar"><div></div></div>
     <div class="sub">${T.passedWorkDays}/${T.totalWorkDays} work days elapsed · ${T.remainWorkDays} remaining</div>
     <h2>Count Sessions</h2>
     ${sessionTable}
-    <h2>Not Yet Counted (${T.uncountedLocs.length})</h2>
+    <h2>Not Yet Counted (${_uncounted.length})</h2>
     ${uncountedList}
     </body></html>`;
 
@@ -12365,6 +12445,1434 @@ function exportDirToExcel() {
   XLSX.writeFile(wb, 'PickFlow_6021_DIR_'+new Date().toISOString().slice(0,10)+'.xlsx');
   showAlert('✓ DIR data exported to Excel.','success');
 }
+
+
+// ════════════════ ELECTROLIT EDI INBOUND (ported from 6049) ════════════════
+// Fully ISOLATED, additive module: its own namespaced plumbing (_elxEdi*), its own
+// Firebase branch (6021/ediLoadsElx) and view id ('elxedi'). Shares NOTHING with 6021's
+// existing EDI Import File system, so that system and every other 6021 feature are untouched.
+// Reuses only the shared ELX_MASTER / _elxMaster data table (defined once near the top).
+// ═══ EDI SUBSYSTEM (Electrolit inbound) — Phase 1 plumbing ════════════════════
+// Ported from PickFlow 6021's EDI v24/v27 design, adapted to 6049 (bare paths,
+// no DB_ENV). Firebase node: ediLoads6049. Data-loss-safe by design: id-keyed
+// loads, per-branch update(), echo suppression, migration/resurrection guard,
+// localStorage mirror. Electrolit parse/export land in Phase 2/3.
+
+// ---- pdf.js + Tesseract lazy loaders (Phase 3 PDF/scanned sources) ------------
+let _elxEdiPdfReady = null;
+function _elxEnsurePdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (_elxEdiPdfReady) return _elxEdiPdfReady;
+  _elxEdiPdfReady = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => {
+      try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } catch (e) {}
+      resolve(window.pdfjsLib);
+    };
+    s.onerror = () => reject(new Error('Could not load pdf.js (check internet connection)'));
+    document.head.appendChild(s);
+  });
+  return _elxEdiPdfReady;
+}
+async function ediExtractPdfLines(arrayBuffer) {
+  const pdfjsLib = await _elxEnsurePdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const lines = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const tc = await (await pdf.getPage(i)).getTextContent();
+    const rows = [];
+    tc.items.forEach(it => {
+      if (!it.str || !it.str.trim()) return;
+      const y = Math.round(it.transform[5]);
+      let row = rows.find(r => Math.abs(r.y - y) <= 2);
+      if (!row) { row = { y, items: [] }; rows.push(row); }
+      row.items.push({ x: it.transform[4], s: it.str });
+    });
+    rows.sort((a, b) => b.y - a.y).forEach(r => {
+      const line = r.items.sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
+      if (line) lines.push(line);
+    });
+  }
+  return lines;
+}
+function _elxEdiTimeout(promise, ms, label){
+  let t; const timer = new Promise((_, rej)=>{ t=setTimeout(()=>rej(new Error((label||'step')+' timed out after '+Math.round(ms/1000)+'s (engine likely blocked by your network)')), ms); });
+  return Promise.race([promise, timer]).finally(()=>clearTimeout(t));
+}
+async function ediEnsureTesseract(){
+  if (window.__elxEdiTessWorker) return window.__elxEdiTessWorker;
+  if (!window.Tesseract){
+    await new Promise((res, rej)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      sc.onload=res;
+      sc.onerror=()=>rej(new Error('OCR engine script blocked — your network is blocking cdn.jsdelivr.net.'));
+      document.head.appendChild(sc);
+    });
+  }
+  window.__elxEdiTessWorker = await window.Tesseract.createWorker('eng', 1);
+  return window.__elxEdiTessWorker;
+}
+
+// ---- Load store (per-customer branches; Electrolit = elx) ---------------------
+if (!window._elxLoads) window._elxLoads = [];
+
+// ---- Firebase sync (id-keyed, per-branch update, echo-suppressed) ------------
+const ELX_EDI_FB_ROOT = '6021/ediLoadsElx';
+const ELX_EDI_LS_KEY  = 'pickflow6021_elxEdi';
+const ELX_EDI_MIG_KEY = 'pickflow_elxEdiMigrated';
+let _elxEdiLastWritten = {};
+function _elxEdiNewId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function _elxEdiWho(){ try { return (state.currentUser && (state.currentUser.name||state.currentUser)) || ''; } catch(e){ return ''; } }
+function _elxEdiStampLoad(l){ if (!l || typeof l!=='object') return l; if (!l._id) l._id=_elxEdiNewId(); if (!l._ts) l._ts=Date.now(); if (!l._by) l._by=_elxEdiWho(); return l; }
+function _elxEdiPack(arr){ const o={}; (arr||[]).forEach(function(l){ _elxEdiStampLoad(l); o[l._id]=l; }); return o; }
+function _elxEdiUnpack(obj){ return Object.values(obj||{}).filter(Boolean).sort(function(a,b){ return (a._ts||0)-(b._ts||0); }); }
+function _elxEdiSnapshot(){ return { elx: _elxEdiPack(window._elxLoads) }; }
+function _elxEdiReadLocal(){ try { const s=localStorage.getItem(ELX_EDI_LS_KEY); return s?JSON.parse(s):null; } catch(e){ return null; } }
+function _elxEdiSaveLocal(){ try { localStorage.setItem(ELX_EDI_LS_KEY, JSON.stringify(Object.assign({v:2, savedAt:Date.now()}, _elxEdiSnapshot()))); } catch(e){} }
+function _elxEdiSave(){
+  _elxEdiSaveLocal();
+  if (!db) return;
+  const cur = _elxEdiSnapshot(), upd = {};
+  Object.keys(cur).forEach(function(k){
+    const s = JSON.stringify(cur[k]||{});
+    if (s !== _elxEdiLastWritten[k]) { upd[k] = cur[k] || {}; _elxEdiLastWritten[k] = s; }
+  });
+  if (!Object.keys(upd).length) return;
+  db.ref(ELX_EDI_FB_ROOT).update(upd).catch(function(e){ console.warn('EDI sync error', e); });
+}
+function _elxEdiSaveEDI(){ if (typeof _elxEdiSave==='function') _elxEdiSave(); }
+function _elxEdiRestore(){
+  const d = _elxEdiReadLocal();
+  if (!d) return;
+  try { window._elxLoads = _elxEdiUnpack(d.elx); }
+  catch (e) { console.warn('EDI restore failed', e); }
+}
+function _elxEdiInputFocused(){
+  if (window._elxEditing) return true;
+  const a = document.activeElement;
+  if (!a || !a.id) return false;
+  return /^(elx-|edi-)/.test(a.id);
+}
+function _elxEdiListen(){
+  if (!db) return;
+  db.ref(ELX_EDI_FB_ROOT).on('value', function(snap){
+    const d = snap.val() || {};
+    // One-time migration: seed remote from local ONCE if remote is empty, then
+    // never resurrect locally-deleted loads.
+    const remoteEmpty = !d.elx;
+    let migrated = false;
+    try { migrated = !!localStorage.getItem(ELX_EDI_MIG_KEY); } catch(e){}
+    if (remoteEmpty && !migrated) {
+      try { localStorage.setItem(ELX_EDI_MIG_KEY, String(Date.now())); } catch(e){}
+      const localHas = (window._elxLoads||[]).length;
+      if (localHas) { _elxEdiLastWritten = {}; _elxEdiSave(); return; }
+    }
+    if (_elxEdiInputFocused()) return;   // mid-edit — don't rebuild the model/UI under the user
+    window._elxLoads = _elxEdiUnpack(d.elx);
+    // Record what we received so the next _elxEdiSave() doesn't echo it back.
+    const cur = _elxEdiSnapshot();
+    Object.keys(cur).forEach(function(k){ _elxEdiLastWritten[k] = JSON.stringify(cur[k]||{}); });
+    _elxEdiSaveLocal();
+    if (state.currentView === 'elxedi' && !_elxEdiInputFocused()) { try { renderElxLoads(); } catch(e){} }
+  }, function(e){ console.warn('EDI listener error', e); });
+}
+
+// ---- Inline-edit cell helpers (generic; ported verbatim from 6021 v27) -------
+function _elxEdiNum(v){ if(v===''||v==null) return ''; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?'':n; }
+function _elxEdiCellInput(genKey, a, b, field, value, opts){
+  opts = opts || {};
+  const esc = String(value==null?'':value).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const align = opts.num ? 'right' : 'left';
+  const w = opts.width || (opts.num ? '78px' : '100%');
+  function jsArg(v){ if (typeof v==='number') return String(v); return "'"+String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;').replace(/"/g,'&quot;')+"'"; }
+  const args = "'"+genKey+"',"+jsArg(a)+","+(b==null?'null':jsArg(b))+",'"+field+"',this.value";
+  return '<input value="'+esc+'"'
+    +' oninput="_elxEdiSetCell('+args+',false)"'
+    +' onchange="_elxEdiSetCell('+args+',true)"'
+    +' spellcheck="false"'
+    +' style="width:'+w+';box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:4px;'
+    +'padding:2px 5px;color:var(--text);font-family:var(--font);font-size:10px;text-align:'+align+';outline:none">';
+}
+function _elxEdiRerender(genKey){
+  if (genKey==='elx') { try { renderElxLoads(); } catch(e){} }
+}
+function _elxEdiReopenDetail(detailId){
+  if (!detailId) return;
+  setTimeout(function(){
+    const el=document.getElementById(detailId); const btn=document.getElementById(detailId+'-btn');
+    if (el){ el.style.display='block'; if(btn) btn.textContent='▲'; }
+  }, 0);
+}
+function _elxEdiSetCell(genKey, a, b, field, value, commit){
+  let row=null, load=null, detailId='';
+  if (genKey==='elx'){ load=(window._elxLoads||[])[a]; if(load){ row=(load.rows||[])[b]; detailId='elx-detail-'+a; } }
+  if (!row) return;
+  const numeric = { pallets:1, pcs:1, weight:1, wt:1, ovrWt:1, ovrPcs:1, net:1, gross:1 };
+  row[field] = numeric[field] ? _elxEdiNum(value) : value;
+  if (!commit) return;              // still typing — don't re-render yet
+  try { _elxEdiSaveEDI(); } catch(e){}
+  _elxEdiRerender(genKey);
+  _elxEdiReopenDetail(detailId);
+}
+function _elxToggleEDIDetail(id) {
+  const el  = document.getElementById(id);
+  const btn = document.getElementById(id + '-btn');
+  if (!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = open ? '▲' : '▼';
+}
+
+// ---- EDI screen (Phase 1 shell; Electrolit parser/export land in Phase 2/3) --
+function _elxInt(v){ const n=parseFloat(String(v==null?'':v).replace(/,/g,'')); return isNaN(n)?0:Math.round(n); }
+function _elxCols(headerRow){
+  const norm = s => String(s==null?'':s).trim().toLowerCase();
+  const find = names => { for (let i=0;i<headerRow.length;i++){ const h=norm(headerRow[i]); if(names.indexOf(h)>=0) return i; } return -1; };
+  return { pedido:find(['pedido']), invoice:find(['invoice']), entrega:find(['entrega']), material:find(['material']),
+           desc:find(['material description']), lote:find(['lote']), tarimas:find(['tarimas']),
+           bpp:find(['bottles per pallet']) };
+}
+function _elxParseWorkbook(data){
+  const wb = XLSX.read(data, { type:'array' });
+  const name = wb.SheetNames.find(n => /concentrado.?base/i.test(n)) || wb.SheetNames[0];
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, defval:'' });
+  if (!aoa.length) return { sheet:name, cols:null, rows:[] };
+  const cols = _elxCols(aoa[0]);
+  const rows = [];
+  for (let i=1;i<aoa.length;i++){
+    const r = aoa[i];
+    const ped = cols.pedido>=0 ? r[cols.pedido] : '';
+    if (ped==='' || ped==null) continue;
+    const inv = cols.invoice>=0 ? r[cols.invoice] : '';
+    rows.push({ pedido:String(ped).trim(), invoice:(inv==null?'':String(inv).trim()), entrega:cols.entrega>=0?r[cols.entrega]:'',
+      material:String(cols.material>=0?r[cols.material]:'').trim(), desc:cols.desc>=0?r[cols.desc]:'',
+      lote:String(cols.lote>=0?r[cols.lote]:'').trim(), tarimas:_elxInt(cols.tarimas>=0?r[cols.tarimas]:0),
+      bpp:_elxInt(cols.bpp>=0?r[cols.bpp]:0) });
+  }
+  return { sheet:name, cols:cols, rows:rows };
+}
+function _elxBuildLoad(srcRows, query){
+  const key = String(query==null?'':query).trim();
+  const matched = (srcRows||[]).filter(r => String(r.pedido).trim() === key || String(r.invoice).trim() === key);
+  const pedSet=[], invSet=[];
+  matched.forEach(function(r){
+    const pd=String(r.pedido==null?'':r.pedido).trim(); if(pd && pedSet.indexOf(pd)<0) pedSet.push(pd);
+    const iv=String(r.invoice==null?'':r.invoice).trim(); if(iv && invSet.indexOf(iv)<0) invSet.push(iv);
+  });
+  const order = (pedSet.indexOf(key)>=0) ? key : (pedSet[0]||'');
+  const po    = (invSet.indexOf(key)>=0) ? key : (invSet[0]||'');
+  return { order:order, po:po, multiPo:(invSet.length>1), pos:invSet, header:{receiver:'',invoice:'',truck:''}, rows:_elxExplode(matched), createdAt:0 };
+}
+// Explode matched source rows into one export line per pallet (Tarimas), pulling
+// productId / weights / cases from the master. Shared by direct builds + summary.
+function _elxExplode(matchedRows){
+  const lines=[];
+  (matchedRows||[]).forEach(function(r){
+    const m=_elxMaster(r.material);
+    const productId=(m&&m[0])?m[0]:(r.desc||'');
+    const net=m?m[1]:null, gross=m?m[2]:null, cases=m?m[3]:null;
+    const pcs=(cases!=null)?cases:r.bpp;
+    for(let p=0;p<(r.tarimas>0?r.tarimas:0);p++){
+      lines.push(_elxStampExp({ sku:r.material, productId:productId, lot:r.lote, pcs:pcs,
+                   net:(net==null?'':net), gross:(gross==null?'':gross), entrega:r.entrega, unknownSku:!m }));
+    }
+  });
+  return lines;
+}
+// Break an Order down by PO (+ an unassigned "No PO" bucket grouped by SKU+Lot).
+function _elxOrderSummary(srcRows, order){
+  const key=String(order==null?'':order).trim();
+  const matched=(srcRows||[]).filter(r=>String(r.pedido).trim()===key);
+  const poMap={}, poOrder=[], noPoRows=[];
+  matched.forEach(function(r){
+    const iv=String(r.invoice==null?'':r.invoice).trim();
+    if(iv){ if(!poMap[iv]){poMap[iv]=[]; poOrder.push(iv);} poMap[iv].push(r); }
+    else noPoRows.push(r);
+  });
+  const casesOf=function(r){ const m=_elxMaster(r.material); const c=(m&&m[3]!=null)?m[3]:r.bpp; return (r.tarimas>0?r.tarimas:0)*(c||0); };
+  const poGroups=poOrder.map(function(po){
+    const rows=poMap[po];
+    return { po:po, srcRows:rows,
+      pallets:rows.reduce(function(s,r){return s+(r.tarimas>0?r.tarimas:0);},0),
+      cases:rows.reduce(function(s,r){return s+casesOf(r);},0),
+      skus:(function(){var st={};rows.forEach(function(r){st[r.material]=1;});return Object.keys(st).length;})() };
+  });
+  const nm={}, nord=[];
+  noPoRows.forEach(function(r){
+    const k=r.material+'|'+r.lote;
+    if(!nm[k]){ nm[k]={key:k, sku:r.material, lot:r.lote, srcRows:[], pallets:0, cases:0}; nord.push(k); }
+    nm[k].srcRows.push(r); nm[k].pallets+=(r.tarimas>0?r.tarimas:0); nm[k].cases+=casesOf(r);
+  });
+  const noPo=nord.map(function(k){ const it=nm[k]; const m=_elxMaster(it.sku);
+    return { key:k, sku:it.sku, lot:it.lot, productId:(m&&m[0])?m[0]:(it.srcRows[0]?it.srcRows[0].desc:''),
+             pallets:it.pallets, cases:it.cases, unknownSku:!m, srcRows:it.srcRows }; });
+  return { order:key, poGroups:poGroups, noPo:noPo, checked:{} };
+}
+// Commit a built load into the live list.
+function _elxCommitLoad(load){
+  _elxEdiStampLoad(load); load.createdAt=Date.now();
+  window._elxLoads=window._elxLoads||[]; window._elxLoads.push(load);
+  _elxEdiSave();
+  const unknown=load.rows.filter(function(r){return r.unknownSku;}).length;
+  showAlert('✓ Order '+(load.order||'')+(load.po?(' · PO '+load.po):'')+' — '+load.rows.length+' lines'+(unknown?(' · ⚠ '+unknown+' unknown SKU'):''), unknown?'warning':'success');
+  showElxEdi();
+  if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+(window._elxLoads.length-1));
+}
+function _elxBuildPoGroup(i){
+  const s=window._elxSummary; if(!s||!s.poGroups[i]) return;
+  const g=s.poGroups[i]; const order=s.order;
+  s.poGroups.splice(i,1);
+  if(!s.poGroups.length && !s.noPo.length) window._elxSummary=null;
+  _elxCommitLoad({ order:order, po:g.po, multiPo:false, pos:[g.po], header:{receiver:'',invoice:'',truck:''}, rows:_elxExplode(g.srcRows), createdAt:0 });
+}
+function _elxSummaryCheck(key, checked){ const s=window._elxSummary; if(!s) return; s.checked[key]=checked; }
+function _elxBuildNoPo(){
+  const s=window._elxSummary; if(!s) return;
+  const el=document.getElementById('elx-nopo-po'); const po=el?el.value.trim():'';
+  const chosen=s.noPo.filter(function(it){return s.checked[it.key];});
+  if(!chosen.length){ showAlert('Check at least one SKU/Lot line to assign.','warning'); return; }
+  if(!po){ showAlert('Enter the PO # to assign to the selected lines.','warning'); if(el) el.focus(); return; }
+  const srcRows=[]; chosen.forEach(function(it){ srcRows.push.apply(srcRows, it.srcRows); });
+  const order=s.order;
+  s.noPo=s.noPo.filter(function(it){return !s.checked[it.key];}); s.checked={};
+  if(!s.poGroups.length && !s.noPo.length) window._elxSummary=null;
+  _elxCommitLoad({ order:order, po:po, multiPo:false, pos:[po], header:{receiver:'',invoice:'',truck:''}, rows:_elxExplode(srcRows), createdAt:0 });
+}
+function _elxCloseSummary(){ window._elxSummary=null; showElxEdi(); }
+function _elxSummaryLineTable(lines){
+  let h='<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="color:var(--text2)"><th style="text-align:left;padding:2px 6px">SKU</th><th style="text-align:left;padding:2px 6px">PRODUCT ID</th><th style="text-align:left;padding:2px 6px">LOT #</th><th style="text-align:right;padding:2px 6px">PCS</th></tr></thead><tbody>';
+  lines.forEach(function(r){ h+='<tr><td style="padding:2px 6px">'+r.sku+'</td><td style="padding:2px 6px">'+(r.productId||'')+'</td><td style="padding:2px 6px">'+(r.lot||'')+'</td><td style="padding:2px 6px;text-align:right">'+r.pcs+'</td></tr>'; });
+  return h+'</tbody></table>';
+}
+function _elxRenderSummary(s){
+  const G='#2e7d32';
+  let h='<div class="ticket-form" style="margin-bottom:12px;padding:0;overflow:hidden;border:1.5px solid '+G+'">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(46,125,50,0.08)">'
+      +'<div style="flex:1;font-weight:bold;color:'+G+';font-size:13px">Order '+s.order+' — review &amp; assign POs</div>'
+      +'<div style="font-size:10px;color:var(--text2)">'+s.poGroups.length+' PO(s)'+(s.noPo.length?(' · '+s.noPo.length+' unassigned'):'')+'</div>'
+      +'<button onclick="_elxCloseSummary()" title="Dismiss" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px;padding:2px 8px">Dismiss</button>'
+    +'</div><div style="padding:8px 12px">';
+  s.poGroups.forEach(function(g,i){
+    const did='elx-sum-po-'+i;
+    h+='<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:8px 10px">'
+        +'<div style="flex:1;font-size:12px;color:var(--text)"><b style="color:'+G+'">PO '+g.po+'</b> · '+g.skus+' SKU · '+g.pallets+' pallets · '+g.cases.toLocaleString()+' cases</div>'
+        +'<button onclick="_elxBuildPoGroup('+i+')" style="background:'+G+';color:#fff;border:none;border-radius:5px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:700">Build load</button>'
+        +'<button id="'+did+'-btn" onclick="_elxToggleEDIDetail(&quot;'+did+'&quot;)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px;padding:2px 8px">▼</button>'
+      +'</div>'
+      +'<div id="'+did+'" style="display:none;border-top:1px solid var(--border);padding:6px 10px;overflow-x:auto">'+_elxSummaryLineTable(_elxExplode(g.srcRows))+'</div>'
+    +'</div>';
+  });
+  if(s.noPo.length){
+    h+='<div style="border:1.5px dashed var(--warning);border-radius:6px;padding:8px 10px;margin-top:4px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--warning);margin-bottom:6px">⚠ Unassigned (No PO) — check the lines for one PO, enter the PO #, and Build</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>';
+    s.noPo.forEach(function(it){
+      h+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:3px 6px;width:24px"><input type="checkbox" onchange="_elxSummaryCheck(&quot;'+it.key+'&quot;,this.checked)" style="cursor:pointer"></td>'
+        +'<td style="padding:3px 6px"><b>'+it.sku+'</b>'+(it.unknownSku?' <span style="color:var(--danger)">(no master)</span>':'')+'</td>'
+        +'<td style="padding:3px 6px;color:var(--text2)">'+(it.productId||'')+'</td>'
+        +'<td style="padding:3px 6px;color:'+G+'">Lot '+it.lot+'</td>'
+        +'<td style="padding:3px 6px;text-align:right">'+it.pallets+' pallets</td>'
+        +'<td style="padding:3px 6px;text-align:right">'+it.cases.toLocaleString()+' cases</td>'
+      +'</tr>';
+    });
+    h+='</tbody></table>'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">'
+        +'<label style="font-size:11px;color:var(--text2)">Assign PO #:</label>'
+        +'<input id="elx-nopo-po" placeholder="PO #" style="padding:5px 8px;border:1.5px solid '+G+';border-radius:5px;font-size:11px;font-weight:700;background:var(--bg);color:var(--text);width:140px">'
+        +'<button onclick="_elxBuildNoPo()" style="background:'+G+';color:#fff;border:none;border-radius:5px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:700">Assign PO &amp; Build selected</button>'
+      +'</div></div>';
+  }
+  return h+'</div></div>';
+}
+function _elxExportAoa(load, expDate){
+  const rows = load.rows||[];
+  const H = load.header||{};
+  const aoa = [
+    [],
+    ['Receiver', H.receiver||'', null, 'Total Rolls', rows.length, null, null, 'Fraction  Decimal'],
+    ['PO #', load.po||'', null, null, null, null, null, 0.5, 0.5],
+    ['Invoice #', H.invoice||''],
+    ['Truck #', H.truck||'', null, null, null, null, null, 'Piper IBD Order #'],
+    [],
+    [],
+    ['SKU','Product ID','Lot#','Prod ID 2','PO#','Weight','Gross Weight','UOM','LF','Pcs','Width','Exp Date']
+  ];
+  rows.forEach(function(r){
+    aoa.push([ r.sku, r.productId, r.lot, load.po, load.po, (r.net===''?0:r.net), (r.gross===''?0:r.gross),
+               'SKID', 0, r.pcs, 0, (r.expSerial ? r.expSerial : (_wacoBatchExp(r.lot).serial || expDate)) ]);
+  });
+  return aoa;
+}
+// ── Electrolit UI handlers ────────────────────────────────────────────────────
+// ── Electrolit PDF (Bill of Lading) OCR path ──────────────────────────────────
+// Rotate a canvas by 90/180/270° (for scans that come in sideways/upside-down).
+function _elxRotateCanvas(src, deg){
+  const swap = (deg===90||deg===270);
+  const cv=document.createElement('canvas');
+  cv.width  = swap ? src.height : src.width;
+  cv.height = swap ? src.width  : src.height;
+  const ctx=cv.getContext('2d');
+  ctx.translate(cv.width/2, cv.height/2);
+  ctx.rotate(deg*Math.PI/180);
+  ctx.drawImage(src, -src.width/2, -src.height/2);
+  return cv;
+}
+function _elxBinarize(src, thr){
+  const cv=document.createElement('canvas'); cv.width=src.width; cv.height=src.height;
+  const ctx=cv.getContext('2d'); ctx.drawImage(src,0,0);
+  const img=ctx.getImageData(0,0,cv.width,cv.height); const d=img.data;
+  for(let i=0;i<d.length;i+=4){ const l=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const v=l>thr?255:0; d[i]=d[i+1]=d[i+2]=v; }
+  ctx.putImageData(img,0,0); return cv;
+}
+function _elxWordsFromOcr(d){
+  let words=[];
+  if(d&&d.tsv){ d.tsv.split('\n').forEach(function(ln){ const c=ln.split('\t'); if(c.length>=12&&c[0]==='5'){ const conf=parseFloat(c[10]); const s=(c[11]||'').trim(); if(s&&conf>25) words.push({x:+c[6], y:(+c[7])+(+c[9])/2, w:+c[8], s:s}); } }); }
+  if(!words.length&&d&&d.blocks){ (d.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(w=>{ if(w&&w.text&&String(w.text).trim()&&w.bbox){ words.push({x:w.bbox.x0, y:(w.bbox.y0+w.bbox.y1)/2, w:(w.bbox.x1-w.bbox.x0), s:String(w.text).trim()}); } })))); }
+  return words;
+}
+// Locate item rows (SKU) + the Version column x-range from OCR word coordinates.
+function _elxBolRowsFromWords(words){
+  const items=(words||[]).filter(function(w){return /^40\d{5}$/.test(w.s);});
+  const rows=items.map(function(w){ const snap=_elxSnapSku(w.s); return {y:w.y, item:w.s, sku:snap.sku, unknownSku:snap.unknown}; }).sort(function(a,b){return a.y-b.y;});
+  if(!rows.length) return {rows:[], vx0:0, vx1:0};
+  const ymin=rows[0].y-25, ymax=rows[rows.length-1].y+25;
+  const verish=(words||[]).filter(function(w){ const s=w.s.replace(/\s/g,''); return w.y>=ymin&&w.y<=ymax&&s.length>=5&&s.length<=10&&/[PT]/i.test(s)&&/\d{3}/.test(s); });
+  let vx0=0, vx1=0;
+  if(verish.length){ vx0=Math.min.apply(null,verish.map(function(w){return w.x;}))-25; vx1=Math.max.apply(null,verish.map(function(w){return w.x+w.w;}))+25; }
+  return {rows:rows, vx0:vx0, vx1:vx1};
+}
+function _elxOcrLines(words){
+  if(!words||!words.length) return [];
+  const rows=[];
+  words.forEach(function(w){ let r=rows.find(function(r){return Math.abs(r.y-w.y)<=14;}); if(!r){r={y:w.y,items:[]};rows.push(r);} r.items.push(w); });
+  rows.sort(function(a,b){return a.y-b.y;});
+  return rows.map(function(r){return r.items.sort(function(a,b){return a.x-b.x;}).map(function(o){return o.s;}).join(' ').replace(/\s+/g,' ').trim();}).filter(Boolean);
+}
+async function _elxOcrBol(buf){
+  const pdfjsLib=await _elxEnsurePdfJs();
+  const worker=await _elxEdiTimeout(ediEnsureTesseract(),120000,'OCR engine load');
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const N=pdf.numPages||1;
+  const canvasAt=async function(page,scale){ const vp=page.getViewport({scale:scale}); const cv=document.createElement('canvas'); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height); await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; return cv; };
+  const recFull=async function(cv){ try{ return (await worker.recognize(cv,{},{tsv:true,blocks:true})).data; }catch(e){ return null; } };
+  let headerBlob=''; const rows=[];
+  for(let i=1;i<=N;i++){
+    showAlert('Electrolit PDF OCR — page '+i+' of '+N+'…','info');
+    let base=await canvasAt(await pdf.getPage(i),3);
+    let words=_elxWordsFromOcr(await recFull(_elxBinarize(base,185)));
+    let det=_elxBolRowsFromWords(words);
+    // Auto-correct a sideways / upside-down scan: if no SKU rows were found at the
+    // rendered orientation, rotate the page and re-OCR until the item rows appear.
+    if(!det.rows.length){
+      const cand=[90,270,180];
+      for(let a=0;a<cand.length;a++){
+        const rb=_elxRotateCanvas(base,cand[a]);
+        const rw=_elxWordsFromOcr(await recFull(_elxBinarize(rb,185)));
+        const rd=_elxBolRowsFromWords(rw);
+        if(rd.rows.length){ base=rb; words=rw; det=rd; break; }
+      }
+    }
+    const lines=_elxOcrLines(words);
+    if(i===1){ headerBlob += lines.join('\n')+'\n';
+      const w2=_elxWordsFromOcr(await recFull(_elxBinarize(base,205))); headerBlob += _elxOcrLines(w2).join('\n')+'\n'; }
+    if(!det.rows.length) continue;
+    if(det.rows.length) showAlert('Electrolit PDF — reading '+det.rows.length+' LOT #s (page '+i+')…','info');
+    // Read each row's LOT from the FULL-PAGE OCR by coordinate: take the version-
+    // pattern word whose y is closest to the SKU row. This is far more reliable than
+    // re-OCRing a tiny isolated cell (which starves Tesseract on lower-res scans) and,
+    // unlike the old text-line fallback, it never smears one LOT across rows that
+    // share the same SKU (every pallet here is the same item).
+    const hasBand = det.vx1>det.vx0;
+    const vwords = words.filter(function(w){
+      const s=w.s.replace(/\s/g,'');
+      if(!/\d{2}[t7]\d{3}/i.test(s)) return false;
+      return hasBand ? (w.x>=det.vx0-30 && w.x<=det.vx1+30) : true;
+    });
+    for(let ri=0; ri<det.rows.length; ri++){
+      const r=det.rows[ri];
+      let best='', bd=1e9;
+      vwords.forEach(function(w){ const d=Math.abs(w.y-r.y); if(d<bd){ bd=d; best=w.s; } });
+      let lot=_elxVersion(best);
+      if(!lot){ const ln=lines.find(function(l){ return l.indexOf(r.item)>=0; }); if(ln) lot=_elxVersion(ln); }
+      rows.push({ sku:r.sku, lot:lot, unknownSku:r.unknownSku });
+    }
+  }
+  // Clean LOT misreads: snap a rare single-digit-off value to the real (repeated)
+  // LOT it's closest to, then fill/settle any isolated outlier or blank.
+  const _sm=_elxSmoothLots(_elxSnapLots(rows.map(function(r){return r.lot;})));
+  rows.forEach(function(r,i){ r.lot=_sm[i]; });
+  return { header:_elxBolHeader(headerBlob), rows:rows };
+}
+// Snap a rare LOT value that is a single-digit OCR confusion (e.g. 1969→1909,
+// 1920→1910) onto a "real" LOT — one that repeats on the load. Values that repeat
+// are treated as anchors and left alone; genuinely distinct one-off LOTs (2+ digits
+// from every anchor) are preserved, so a real single-pallet LOT is never corrupted.
+function _elxSnapLots(lots){
+  const out=lots.slice();
+  const freq={}; out.forEach(function(v){ if(v) freq[v]=(freq[v]||0)+1; });
+  const anchors=Object.keys(freq).filter(function(k){ return freq[k]>=2; });
+  if(!anchors.length) return out;
+  function dg(v){ return String(v).replace(/\D/g,''); }
+  function dist(a,b){ a=dg(a); b=dg(b); if(a.length!==b.length) return 99; let d=0; for(let i=0;i<a.length;i++){ if(a[i]!==b[i]) d++; } return d; }
+  for(let i=0;i<out.length;i++){
+    const v=out[i]; if(!v || freq[v]>=2) continue;
+    let best=null, bd=99;
+    anchors.forEach(function(a){ const d=dist(v,a); if(d<bd){ bd=d; best=a; } });
+    if(best && bd<=1) out[i]=best;
+  }
+  return out;
+}
+// Correct an isolated LOT value (or blank) sitting between two identical neighbors.
+// Two passes so a blank flanked by a run fills, then propagates. Preserves genuine
+// distinct lots (a different value between two different runs is left untouched).
+function _elxSmoothLots(lots){
+  const o=lots.slice();
+  for(let p=0;p<2;p++){
+    for(let i=1;i<o.length-1;i++){
+      if(o[i-1] && o[i-1]===o[i+1] && o[i]!==o[i-1]) o[i]=o[i-1];
+    }
+  }
+  return o;
+}
+function _elxSnapSku(tok){
+  tok=String(tok==null?'':tok).trim();
+  if(ELX_MASTER[tok]) return {sku:tok, unknown:false};
+  const keys=Object.keys(ELX_MASTER);
+  for(let i=0;i<keys.length;i++){ const m=keys[i]; if(m.length===tok.length){ let diff=0; for(let j=0;j<m.length;j++){ if(m[j]!==tok[j]) diff++; } if(diff<=1) return {sku:m, unknown:false}; } }
+  return {sku:tok, unknown:true};
+}
+function _elxVersion(line){
+  const s=String(line==null?'':line).replace(/\s+/g,'').toUpperCase(); let m;
+  m=s.match(/([A-Z]\d{2}[T7]\d{3,4})/); if(m){ const v=m[1]; return v.charAt(0)+v.substr(1,2)+'T'+v.substr(4); }
+  m=s.match(/(\d{2}[T7]\d{3,4})/); if(m){ const v=m[1]; return 'P'+v.substr(0,2)+'T'+v.substr(3); }
+  return '';
+}
+function _elxBolHeader(blob){
+  function f(re){ const m=blob.match(re); return m?m[1]:''; }
+  return { po:f(/\bPO\s*#?\s*:?\s*#?\s*(\d{7,})/i), truck:f(/Tra\w*\s*#?\s*:?\s*#?\s*(\d{4,})/i),
+    order:f(/(?:Order Number|Sales Order\s*#?)\s*:?\s*(\d{6,})/i),
+    palletQty:parseInt(f(/Pallet\s*Qty\s*:?\s*(\d{1,4})/i)||'0',10)||0,
+    totalCases:parseInt((f(/Total\s*Cases\s*:?\s*([\d,]{2,})/i)||'0').replace(/,/g,''),10)||0 };
+}
+function _elxBolRows(pages){
+  const rows=[];
+  (pages||[]).forEach(function(page){
+    let best=[];
+    Object.keys(page).forEach(function(thr){ const items=page[thr].filter(function(ln){ return /\b40\d{5}\b/.test(ln) && /(MP|LBS)/i.test(ln); }); if(items.length>best.length) best=items; });
+    best.forEach(function(ln){ const snap=_elxSnapSku(ln.match(/\b(40\d{5})\b/)[1]); rows.push({sku:snap.sku, lot:_elxVersion(ln), unknownSku:snap.unknown}); });
+  });
+  return rows;
+}
+function _elxExtractBol(pages){
+  let blob=''; const p0=pages[0]||{}; Object.keys(p0).forEach(function(thr){ blob+=p0[thr].join('\n')+'\n'; });
+  return { header:_elxBolHeader(blob), rows:_elxBolRows(pages) };
+}
+function _elxBuildBolLoad(ocr){
+  const header=ocr.header, rows=ocr.rows.slice();
+  const cnt={}; rows.forEach(function(r){ cnt[r.sku]=(cnt[r.sku]||0)+1; });
+  const dom=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0]||'';
+  let target=header.palletQty||0;
+  if(!target && dom && ELX_MASTER[dom] && ELX_MASTER[dom][3] && header.totalCases){ target=Math.round(header.totalCases/ELX_MASTER[dom][3]); }
+  const detected=rows.length;
+  while(target && rows.length<target){ rows.push({sku:dom, lot:'', unknownSku:!ELX_MASTER[dom]}); }
+  const lines=rows.map(function(r){ const m=ELX_MASTER[r.sku];
+    return { sku:r.sku, productId:(m&&m[0])?m[0]:'', lot:r.lot, pcs:(m&&m[3]!=null)?m[3]:'',
+             net:(m&&m[1]!=null)?m[1]:'', gross:(m&&m[2]!=null)?m[2]:'', unknownSku:!m }; });
+  // On these Source Logistics BOLs the load's PO # is the doc's Order Number,
+  // not the printed "PO #" field. Use Order Number; fall back to PO # if absent.
+  const poVal = header.order || header.po || '';
+  return { order:header.order||'', po:poVal, multiPo:false, pos:poVal?[poVal]:[],
+           header:{receiver:'', invoice:'', truck:header.truck||''}, rows:lines, source:'pdf',
+           recon:{palletQty:header.palletQty, totalCases:header.totalCases, detected:detected}, createdAt:0 };
+}
+async function _elxImportPdf(f){
+  try{
+    showAlert('Reading Electrolit PDF (OCR — first run downloads the engine, give it a moment)…','info');
+    const ocr=await _elxOcrBol(await f.arrayBuffer());
+    if(!ocr || (!ocr.rows.length && !ocr.header.palletQty)){ showAlert('Could not read the BOL (OCR found no items — check scan quality).','danger'); return; }
+    const load=_elxBuildBolLoad(ocr);
+    if(!load.rows.length){ showAlert('No pallets read from the BOL.','warning'); return; }
+    _elxEdiStampLoad(load); load.createdAt=Date.now();
+    window._elxLoads=window._elxLoads||[]; window._elxLoads.push(load);
+    _elxEdiSave(); showElxEdi();
+    if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+(window._elxLoads.length-1));
+    const rc=load.recon; const short=(rc.palletQty && rc.detected<rc.palletQty);
+    showAlert('✓ PDF BOL '+f.name+' · Order '+(load.order||'?')+' · PO '+(load.po||'?')+' — '+load.rows.length+' pallets'+(short?(' · ⚠ read '+rc.detected+' of '+rc.palletQty+' — verify LOT #s & the '+(rc.palletQty-rc.detected)+' added line(s)'):' · ⚠ verify LOT #s'), 'warning');
+  }catch(err){ console.error(err); showAlert('Electrolit PDF OCR failed — '+((err&&err.message)||err),'danger'); }
+}
+function _elxImport(ev){
+  const f = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (ev && ev.target) ev.target.value='';
+  if (!f) return;
+  if (/\.pdf$/i.test(f.name)){ _elxRoutePdf(f); return; }
+  const rd = new FileReader();
+  rd.onload = function(e){
+    try {
+      const parsed = _elxParseWorkbook(new Uint8Array(e.target.result));
+      if (!parsed.cols || parsed.cols.invoice<0){ showAlert('Could not find the Invoice column on "'+parsed.sheet+'". Is this the Concentrado-Base report?','danger'); return; }
+      const orders = {}, pos = {}; parsed.rows.forEach(function(r){ if(r.pedido) orders[r.pedido]=1; if(r.invoice) pos[r.invoice]=1; });
+      window._elxSrc = { fileName:f.name, sheet:parsed.sheet, rows:parsed.rows, orderCount:Object.keys(orders).length, poCount:Object.keys(pos).length };
+      showAlert('✓ Imported '+f.name+' — '+parsed.rows.length+' rows · '+Object.keys(orders).length+' Order #s · '+Object.keys(pos).length+' PO#s ('+parsed.sheet+')','success');
+      if (state.currentView==='elxedi') showElxEdi();
+    } catch(err){ console.error(err); showAlert('Electrolit import failed — '+((err&&err.message)||err)+' (XLSX only for now; PDF/scan is Phase 3).','danger'); }
+  };
+  rd.onerror = function(){ showAlert('Could not read the file.','danger'); };
+  rd.readAsArrayBuffer(f);
+}
+function _elxSearch(){
+  const src = window._elxSrc;
+  if (!src || !src.rows || !src.rows.length){ showAlert('Import a Concentrado-Base source file first.','warning'); return; }
+  const el = document.getElementById('edi-order'); const q = el ? el.value.trim() : '';
+  if (!q){ showAlert('Enter an Order # or PO # to search.','warning'); if (el) el.focus(); return; }
+  const isPo    = src.rows.some(function(r){return String(r.invoice).trim()===q;});
+  const isOrder = src.rows.some(function(r){return String(r.pedido).trim()===q;});
+  if (!isPo && !isOrder){ showAlert('Order/PO '+q+' not found in '+src.fileName+'.','warning'); return; }
+  // Direct PO search → one load for that PO.
+  if (isPo && !isOrder){ _elxCommitLoad(_elxBuildLoad(src.rows, q)); return; }
+  // Order search → summarise by PO when it spans >1 PO or has unassigned (no-PO) lines.
+  const sum = _elxOrderSummary(src.rows, q);
+  if (sum.poGroups.length<=1 && !sum.noPo.length){ _elxCommitLoad(_elxBuildLoad(src.rows, q)); return; }
+  window._elxSummary = sum;
+  showAlert('Order '+q+' — '+sum.poGroups.length+' PO(s)'+(sum.noPo.length?(' + '+sum.noPo.length+' unassigned SKU/Lot group(s)'):'')+'. Review below.','info');
+  showElxEdi();
+}
+function _elxHdr(idx, key, val){ const load=(window._elxLoads||[])[idx]; if(!load) return; load.header=load.header||{}; load.header[key]=val; try{_elxEdiSave();}catch(e){} }
+function _elxSetPo(idx, val){ const load=(window._elxLoads||[])[idx]; if(!load) return; load.po=val; try{_elxEdiSave();}catch(e){} }
+function _elxDeleteRow(idx, ri){ const load=(window._elxLoads||[])[idx]; if(!load||!load.rows||!load.rows[ri]) return; if(!confirm('Delete this line?')) return; load.rows.splice(ri,1); if(!load.rows.length){ (window._elxLoads||[]).splice(idx,1); } _elxEdiSave(); showElxEdi(); if(load.rows&&load.rows.length&&typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+idx); }
+function _elxDeleteLoad(idx){ const load=(window._elxLoads||[])[idx]; if(!load) return; if(!confirm('Remove PO '+(load.po||'')+' load?')) return; (window._elxLoads||[]).splice(idx,1); _elxEdiSave(); showElxEdi(); }
+function _elxExport(idx){
+  const load=(window._elxLoads||[])[idx]; if(!load) return;
+  if(!load.rows||!load.rows.length){ showAlert('No lines to export for PO '+(load.po||'')+'.','warning'); return; }
+  const now=new Date(); const serial=Math.round(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/86400000)+25569;
+  const aoa=_elxExportAoa(load, serial);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  for(let k=0;k<load.rows.length;k++){ const ref=XLSX.utils.encode_cell({r:8+k,c:11}); if(ws[ref]){ ws[ref].t='n'; ws[ref].z='m/d/yy'; } }
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const fnid = load.po || load.order || 'export';
+  XLSX.writeFile(wb, 'EDI_Electrolit_'+fnid+'.xlsx');
+  showAlert('✓ Exported EDI_Electrolit_'+fnid+'.xlsx — '+load.rows.length+' lines','success');
+}
+// ── Electrolit screen + render ────────────────────────────────────────────────
+// ═══ LAREDO TRANSFER — routes the scanned COR / Del Bravo BOL PDF to the existing
+// Del Bravo reader (OCR all pages -> parse Material/Exp/Lot/#Inv/Cases -> stage -> Split by PO).
+// Purely a dedicated entry point; the Del Bravo reader logic is unchanged.
+function _larImport(ev){
+  const f=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
+  if(!f) return;
+  if(!/\.pdf$/i.test(f.name)){ showAlert('Laredo Transfer expects the scanned COR / Del Bravo BOL PDF.','warning'); return; }
+  f.arrayBuffer().then(function(buf){ try{ _elxDelBravoImport(buf, f.name); }catch(e){ showAlert('Laredo import failed — '+((e&&e.message)||e),'danger'); } })
+                 .catch(function(){ showAlert('Could not read the PDF.','danger'); });
+}
+// ═══ WACO PLANT — Electrolit packing-list reader (multi-tab XLSX; 1 load per tab) ═══
+// Batch e.g. "WA26U0102": plant letters, 2-digit year (26->2026), month letter, then lot detail.
+// WACO_MON maps the month letter -> month number (1-12). Left blank until the plant legend is
+// confirmed; an unknown/blank month yields no exp date (export falls back to today, as before).
+const WACO_MON = { E:1, F:2, M:3, A:4, Y:5, J:6, U:7, G:8, S:9, T:10, N:11, D:12 };
+function _wacoBatchExp(batch){
+  const str=String(batch==null?'':batch).trim().toUpperCase();
+  const m=str.match(/^[A-Z]{1,3}(\d{2})([A-Z])/);
+  if(!m) return { year:0, month:0, serial:0, label:'' };
+  const year=2000+parseInt(m[1],10);
+  const month=WACO_MON[m[2]]||0;
+  if(!month) return { year:year, month:0, serial:0, label:'' };
+  const serial=Math.round(Date.UTC(year,month-1,1)/86400000)+25569;
+  return { year:year, month:month, serial:serial, label:(month)+'/'+year };
+}
+// Parse a Waco packing-list workbook: each sheet/tab becomes one load.
+// Electrolit's expiration date is encoded in the lot/batch (plant + 2-digit year + month letter).
+// Stamp expSerial + expLabel onto a row from its lot so EVERY Electrolit load-creation path
+// (Concentrado search, Del Bravo, BOL OCR, Waco, grid edits) auto-populates the exp date.
+// No-op when the lot is blank or doesn't decode, so manual/placeholder lots are left alone.
+function _elxStampExp(row){ if(!row) return row; var e=_wacoBatchExp(row.lot); if(e&&e.serial){ row.expSerial=e.serial; row.expLabel=e.label; } return row; }
+function _wacoParse(data){
+  const wb=XLSX.read(data,{type:'array'});
+  const out=[];
+  (wb.SheetNames||[]).forEach(function(sn){
+    const ws=wb.Sheets[sn]; if(!ws) return;
+    const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const cell=function(r,c){ return (aoa[r]&&aoa[r][c]!=null)?aoa[r][c]:''; };
+    function hval(label){
+      for(let r=0;r<Math.min(aoa.length,18);r++){
+        if(String(cell(r,0)).trim().toLowerCase()===label.toLowerCase()) return cell(r,2);
+      }
+      return '';
+    }
+    const custPO=String(hval('Customer PO No.')||sn).trim();
+    const salesOrder=String(hval('Sales Order No.')||'').trim();
+    const packingList=String(hval('Packing List No.')||'').trim();
+    const carrier=String(hval('Carrier')||'').trim();
+    const seal=String(hval('Seal No.')||'').trim();
+    const trailer=String(hval('Trailer No.')||'').trim();
+    let hr=-1;
+    for(let r=0;r<aoa.length;r++){ if(String(cell(r,0)).trim()==='#' && /handling/i.test(String(cell(r,1)))){ hr=r; break; } }
+    const rows=[];
+    if(hr>=0){
+      for(let r=hr+1;r<aoa.length;r++){
+        const num=String(cell(r,0)).trim();
+        if(!/^\d+$/.test(num)) break;
+        const hu=String(cell(r,1)).trim(), sku=String(cell(r,2)).trim(),
+              desc=String(cell(r,3)).trim(), batch=String(cell(r,4)).trim();
+        if(!sku) continue;
+        rows.push({ handlingUnit:hu, sku:sku, desc:desc, batch:batch });
+      }
+    }
+    out.push({ tab:sn, custPO:custPO, salesOrder:salesOrder, packingList:packingList, carrier:carrier, seal:seal, trailer:trailer, rows:rows });
+  });
+  return out;
+}
+// Build an _elxLoads entry from one parsed Waco tab (one pallet-row per Handling Unit).
+function _wacoBuildLoad(t){
+  const rows=[];
+  (t.rows||[]).forEach(function(pr){
+    const m=_elxMaster(pr.sku);
+    const productId=(m&&m[0])?m[0]:(pr.desc||'');
+    const net=m?m[1]:'', gross=m?m[2]:'', cases=m?m[3]:'';
+    const exp=_wacoBatchExp(pr.batch);
+    rows.push({ sku:pr.sku, productId:productId, lot:pr.batch, pcs:(cases!=null?cases:0),
+                net:(net==null?'':net), gross:(gross==null?'':gross), entrega:'',
+                skid:pr.handlingUnit, expSerial:exp.serial, expLabel:exp.label, unknownSku:!m });
+  });
+  return { order:t.salesOrder, po:t.custPO, multiPo:false, pos:[t.custPO], supplier:'WACO',
+           header:{ receiver:'ELECTROLIT', invoice:t.custPO, truck:t.trailer||'' },
+           waco:{ packingList:t.packingList, carrier:t.carrier, seal:t.seal },
+           rows:rows, createdAt:0 };
+}
+function _wacoImport(ev){
+  const f=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=function(e){
+    try{
+      const parsed=_wacoParse(new Uint8Array(e.target.result));
+      const good=parsed.filter(function(t){ return t.rows&&t.rows.length; });
+      if(!good.length){ showAlert('No Waco packing-list tabs with pallet rows found in '+f.name+'.','danger'); return; }
+      window._wacoStage={ fileName:f.name, tabs:good };
+      showAlert('✓ Read '+f.name+' — '+good.length+' load tab(s). Review below.','success');
+      if(state.currentView==='elxedi') showElxEdi();
+    }catch(err){ console.error(err); showAlert('Waco import failed — '+((err&&err.message)||err),'danger'); }
+  };
+  rd.onerror=function(){ showAlert('Could not read the file.','danger'); };
+  rd.readAsArrayBuffer(f);
+}
+function _wacoRenderStage(){
+  const host=document.getElementById('waco-stage'); if(!host) return;
+  const st=window._wacoStage;
+  if(!st||!st.tabs||!st.tabs.length){ host.innerHTML=''; return; }
+  let h='<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
+  h+='<div style="font-size:11px;color:var(--text2);margin-bottom:6px">Review — '+st.fileName+' · '+st.tabs.length+' load(s):</div>';
+  st.tabs.forEach(function(t){
+    const skus={}, lots={}; let unk=0;
+    (t.rows||[]).forEach(function(r){ skus[r.sku]=1; lots[r.batch]=1; if(!_elxMaster(r.sku)) unk++; });
+    const exp=_wacoBatchExp((t.rows[0]||{}).batch);
+    h+='<div style="font-size:11px;padding:6px 9px;border:1px solid var(--border);border-radius:6px;margin-bottom:5px">'
+      +'<strong style="color:var(--accent)">'+t.tab+'</strong> · PO '+t.custPO+' · Order '+(t.salesOrder||'—')
+      +' · '+t.rows.length+' pallets · SKU '+Object.keys(skus).join(', ')
+      +' · Batch '+Object.keys(lots).join(', ')
+      +' · Exp '+(exp.label||'—')
+      +(unk?(' · <span style="color:var(--warning)">⚠ '+unk+' unknown SKU</span>'):'')
+      +'</div>';
+  });
+  h+='<button class="btn btn-primary" onclick="_wacoCommitAll()">✓ Create '+st.tabs.length+' Load(s)</button>';
+  h+=' <button class="btn" onclick="window._wacoStage=null;showElxEdi()">Cancel</button>';
+  h+='</div>';
+  host.innerHTML=h;
+}
+function _wacoCommitAll(){
+  const st=window._wacoStage; if(!st||!st.tabs) return;
+  let n=0;
+  st.tabs.forEach(function(t){
+    const load=_wacoBuildLoad(t);
+    try{ _elxEdiStampLoad(load); }catch(e){}
+    load.createdAt=Date.now();
+    window._elxLoads=window._elxLoads||[]; window._elxLoads.push(load); n++;
+  });
+  window._wacoStage=null;
+  try{ _elxEdiSave(); }catch(e){}
+  showElxEdi();
+  showAlert('✓ Created '+n+' Waco load(s).','success');
+}
+// ═══ ADDITIONAL SOURCE — shipment-plan XLSX (e.g. "ATL transit") ═══════════════
+// Read alongside the Concentrado-Base file. Rows are mapped into the SAME source schema
+// {pedido, invoice, entrega, material, desc, lote, tarimas, bpp} and merged into window._elxSrc,
+// so the existing Order#/PO# search, load build, and export all work over the combined data.
+// Header names are Spanish and may sit below a title row; matched accent/space-insensitively.
+function _elxTnorm(v){ return String(v==null?'':v).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+function _elxParseShipmentPlan(data){
+  const wb = XLSX.read(data, { type:'array', cellDates:true });
+  const names = wb.SheetNames || [];
+  let found = null;
+  for (let si=0; si<names.length && !found; si++){
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[names[si]], { header:1, defval:'' });
+    for (let i=0;i<Math.min(aoa.length,15);i++){
+      const norms = (aoa[i]||[]).map(_elxTnorm);
+      const hasAny = function(al){ return al.some(function(a){ return norms.indexOf(a)>=0; }); };
+      // Accept Spanish (Concentrado / ATL transit) OR English (Atlanta Inbounds in Transit) headers.
+      if (hasAny(['pedido','order']) && (hasAny(['material','materialid']) || hasAny(['entrega','delivery']))){
+        found = { sheet:names[si], aoa:aoa, hi:i, norms:norms }; break;
+      }
+    }
+  }
+  if (!found) return { sheet:(names[0]||''), rows:[] };
+  const norms = found.norms;
+  const col = function(al){ for (let i=0;i<norms.length;i++){ if (al.indexOf(norms[i])>=0) return i; } return -1; };
+  const ci = { pedido:col(['pedido','order']), factura:col(['factura','invoice']), entrega:col(['entrega','delivery']),
+    material:col(['material','materialid']), desc:col(['nombremateria','nombrematerial','materialdescription']), lote:col(['lote','lot']),
+    cant:col(['cantidad','cases','cantidadcajas']), pall:col(['ctdpall','pallets','sumofpallets','pallet']) };
+  const g = function(r,i){ return i>=0 ? r[i] : ''; };
+  const rows = [];
+  for (let i=found.hi+1;i<found.aoa.length;i++){
+    const r = found.aoa[i];
+    const ped = String(g(r,ci.pedido)==null?'':g(r,ci.pedido)).trim();
+    if (!ped) continue;
+    const cant = _elxInt(g(r,ci.cant)), pall = _elxInt(g(r,ci.pall));
+    rows.push({ pedido:ped,
+      invoice:String(g(r,ci.factura)==null?'':g(r,ci.factura)).trim(),
+      entrega:g(r,ci.entrega),
+      material:String(g(r,ci.material)==null?'':g(r,ci.material)).trim(),
+      desc:g(r,ci.desc),
+      lote:String(g(r,ci.lote)==null?'':g(r,ci.lote)).trim(),
+      tarimas:pall,
+      bpp:(pall>0 && cant>0) ? Math.round(cant/pall) : 0 });
+  }
+  return { sheet:found.sheet, rows:rows };
+}
+// Merge every stored additional file's rows onto the current Concentrado base rows.
+window._elxAddlStore = window._elxAddlStore || {};
+function _elxMergeAddl(){
+  const base = ((window._elxSrc && window._elxSrc.rows) ? window._elxSrc.rows : []).filter(function(r){ return !r._addlSrc; });
+  const rows = base.slice();
+  const files = Object.keys(window._elxAddlStore);
+  files.forEach(function(fn){ (window._elxAddlStore[fn]||[]).forEach(function(r){ const rr=Object.assign({}, r); rr._addlSrc=fn; rows.push(rr); }); });
+  const orders={}, pos={}; rows.forEach(function(r){ if(r.pedido) orders[r.pedido]=1; if(r.invoice) pos[r.invoice]=1; });
+  const S = window._elxSrc || { fileName:'', sheet:'' };
+  S.rows = rows; S.orderCount = Object.keys(orders).length; S.poCount = Object.keys(pos).length;
+  S.addlFiles = files.slice();
+  if (!S.fileName) S.fileName = files[0] || '';
+  window._elxSrc = S;
+}
+function _elxAddlImport(ev){
+  const f = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (ev && ev.target) ev.target.value='';
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = function(e){
+    try{
+      const parsed = _elxParseShipmentPlan(new Uint8Array(e.target.result));
+      if (!parsed.rows.length){ showAlert('No shipment-plan rows found in '+f.name+' (need columns like pedido, entrega, material, lote, Ctd Pall).','danger'); return; }
+      window._elxAddlStore = window._elxAddlStore || {};
+      window._elxAddlStore[f.name] = parsed.rows;
+      _elxMergeAddl();
+      showAlert('✓ Added source '+f.name+' — '+parsed.rows.length+' rows ('+parsed.sheet+'). Combined base is now '+window._elxSrc.rows.length+' rows · '+window._elxSrc.orderCount+' Order #s · '+window._elxSrc.poCount+' PO#s.','success');
+      if (state.currentView==='elxedi') showElxEdi();
+    }catch(err){ console.error(err); showAlert('Additional source import failed — '+((err&&err.message)||err),'danger'); }
+  };
+  rd.onerror = function(){ showAlert('Could not read the file.','danger'); };
+  rd.readAsArrayBuffer(f);
+}
+function showElxEdi(){
+  state.currentView = 'elxedi';
+  const src = window._elxSrc;
+  const srcLine = src
+    ? '<span style="color:var(--accent2)">✓ '+src.fileName+'</span> · '+src.rows.length+' rows · '+src.orderCount+' Order #s · '+src.poCount+' PO#s ('+src.sheet+')'
+    : '<span style="color:var(--text2)">No source imported yet — import the Concentrado-Base XLSX to search a PO.</span>';
+  const _addlFiles = (window._elxSrc && window._elxSrc.addlFiles) ? window._elxSrc.addlFiles : [];
+  const addlLine = _addlFiles.length
+    ? '<span style="color:var(--accent2)">✓ Additional source(s): '+_addlFiles.join(', ')+'</span> — merged into the base data'
+    : '<span style="color:var(--text2)">Optional — also drop a shipment-plan XLSX (e.g. ATL transit or Atlanta Inbounds in Transit) to widen the base data. Import the Concentrado first, then additional files.</span>';
+  document.getElementById('main-panel').innerHTML = `
+    <div class="section-title">EDI · ELECTROLIT INBOUND</div>
+    <div id="edi-dup-warn"></div>
+    <div class="ticket-form" style="margin-bottom:14px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:2;min-width:220px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">SOURCE FILE — Concentrado-Base XLSX or scanned BOL PDF</div>
+          <div id="edi-drop" ondragover="event.preventDefault();this.style.borderColor='#2e7d32'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';_elxImport({target:{files:event.dataTransfer.files}})" onclick="document.getElementById('edi-file-input').click()"
+               style="border:1.5px dashed var(--border);border-radius:6px;padding:14px;text-align:center;color:var(--text2);cursor:pointer;font-size:12px">
+            Drop or click to import — XLSX (inbound report) or PDF (Bill of Lading, auto-OCR)
+          </div>
+          <input type="file" id="edi-file-input" accept=".xlsx,.xls,.pdf" style="display:none" onchange="_elxImport(event)">
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">ORDER # / PO # SEARCH</div>
+          <div style="display:flex;gap:6px">
+            <input id="edi-order" placeholder="Order # or PO #" onkeydown="if(event.key==='Enter')_elxSearch()" style="flex:1;min-width:0;padding:7px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font)">
+            <button class="btn btn-primary" onclick="_elxSearch()" style="white-space:nowrap">Search</button>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;margin-top:8px">${srcLine}</div>
+      <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:8px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">ADDITIONAL SOURCE (optional) — shipment-plan XLSX (e.g. ATL transit or Atlanta Inbounds in Transit), read as extra base data</div>
+        <div id="elx-addl-drop" ondragover="event.preventDefault();this.style.borderColor='#2e7d32'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';_elxAddlImport({target:{files:event.dataTransfer.files}})" onclick="document.getElementById('elx-addl-input').click()"
+             style="border:1.5px dashed var(--border);border-radius:6px;padding:12px;text-align:center;color:var(--text2);cursor:pointer;font-size:12px">
+          Drop or click to add a shipment-plan XLSX — merged into the same source data (Order / PO / Lot)
+        </div>
+        <input type="file" id="elx-addl-input" accept=".xlsx,.xls" style="display:none" onchange="_elxAddlImport(event)">
+        <div style="font-size:11px;margin-top:6px">${addlLine}</div>
+      </div>
+    </div>
+    <div class="ticket-form" style="margin-bottom:14px;border:1px solid var(--accent)">
+      <div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:var(--accent);margin-bottom:6px">🏭 WACO PLANT — Packing List (multi-tab XLSX · one load per tab)</div>
+      <div id="waco-drop" ondragover="event.preventDefault();this.style.borderColor='#2e7d32'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';_wacoImport({target:{files:event.dataTransfer.files}})" onclick="document.getElementById('waco-file-input').click()"
+           style="border:1.5px dashed var(--border);border-radius:6px;padding:12px;text-align:center;color:var(--text2);cursor:pointer;font-size:12px">
+        Drop or click to import the Waco packing-list workbook — each tab becomes one Electrolit load
+      </div>
+      <input type="file" id="waco-file-input" accept=".xlsx,.xls" style="display:none" onchange="_wacoImport(event)">
+      <div id="waco-stage"></div>
+    </div>
+    <div class="ticket-form" style="margin-bottom:14px;border:1px solid var(--accent)">
+      <div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:var(--accent);margin-bottom:6px">🚛 LAREDO TRANSFER — Del Bravo COR / BOL (scanned PDF · OCR)</div>
+      <div id="lar-drop" ondragover="event.preventDefault();this.style.borderColor='#2e7d32'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';_larImport({target:{files:event.dataTransfer.files}})" onclick="document.getElementById('lar-file-input').click()"
+           style="border:1.5px dashed var(--border);border-radius:6px;padding:12px;text-align:center;color:var(--text2);cursor:pointer;font-size:12px">
+        Drop or click to import the Laredo transfer COR PDF — reads the Del Bravo BOL, then verify &amp; Split by PO
+      </div>
+      <input type="file" id="lar-file-input" accept=".pdf" style="display:none" onchange="_larImport(event)">
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button onclick="showElxManual()" title="Build a manual Electrolit inbound receipt from the SKU master" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:700;margin-right:8px">📥 Manual Inbound</button><button onclick="_elxNewOrder()" title="Add a blank order to fill in manually (same fields as a dragged PDF)" style="background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:700">+ New Order</button>
+    </div>
+    <div id="edi-load-list"></div>`;
+  renderElxLoads();
+  try{ _wacoRenderStage(); }catch(e){}
+}
+// Free-text grid cell: writes value + updates totals in place (NO re-render) so
+// tabbing between fields keeps focus. Saves to Firebase on commit (blur/enter).
+function _elxCell(idx, ri, field, value, opts){
+  opts = opts || {};
+  const esc = String(value==null?'':value).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const align = opts.num ? 'right' : 'left';
+  const w = opts.width || (opts.num ? '80px' : '100%');
+  return '<input id="elx-'+field+'-'+idx+'-'+ri+'" value="'+esc+'"'
+    +' oninput="_elxEdit('+idx+','+ri+',\''+field+'\',this.value.toUpperCase(),false)"'
+    +' onchange="_elxEdit('+idx+','+ri+',\''+field+'\',this.value.toUpperCase(),true)"'
+    +' onfocus="window._elxEditing=true" onblur="_elxCellBlur()"'
+    +' onkeydown="_elxCellKey(event,'+idx+','+ri+',\''+field+'\')"'
+    +' spellcheck="false" autocomplete="off"'
+    +' style="width:'+w+';box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 5px;color:var(--text);font-family:var(--font);font-size:10px;text-transform:uppercase;text-align:'+align+';outline:none">';
+}
+function _elxEdit(idx, ri, field, val, commit){
+  const load=(window._elxLoads||[])[idx]; if(!load||!load.rows||!load.rows[ri]) return;
+  const numeric={ pcs:1, net:1, gross:1 };
+  const row=load.rows[ri];
+  row[field] = numeric[field] ? _elxEdiNum(val) : val;
+  if(field==='sku') row.unknownSku = !_elxMaster(String(val==null?'':val).trim());
+  if(field==='lot') _elxStampExp(row);
+  _elxUpdateTotals(idx);
+  if(commit){ try{ _elxEdiSaveEDI(); }catch(e){} }
+}
+// Keep the grid stable while editing: hold the editing guard until focus truly
+// leaves the grid (not just hops to the next cell). The Firebase listener checks
+// window._elxEditing and skips re-rendering while it's set — so nothing jumps/closes.
+function _elxCellBlur(){
+  setTimeout(function(){
+    const a=document.activeElement;
+    if(!(a && a.id && /^elx-(sku|productId|lot|pcs|net|gross)-\d+-\d+$/.test(a.id))) window._elxEditing=false;
+  },150);
+}
+const _ELX_FIELDS=['sku','productId','lot','pcs','net','gross'];
+// Deterministic keyboard nav: Tab / Shift+Tab move across cells (wrapping row to
+// row), Enter / Shift+Enter move down/up the same column. Delete buttons are
+// skipped (tabindex -1), so the flow stays inside the editable cells.
+function _elxCellKey(e, idx, ri, field){
+  if(e.key!=='Tab' && e.key!=='Enter') return;
+  const load=(window._elxLoads||[])[idx]; if(!load) return;
+  const rows=load.rows||[]; const nf=_ELX_FIELDS.length;
+  const fi=_ELX_FIELDS.indexOf(field); if(fi<0) return;
+  function focusCell(r,f){ const t=document.getElementById('elx-'+_ELX_FIELDS[f]+'-'+idx+'-'+r); if(t){ t.focus(); if(t.select)t.select(); } }
+  let r=ri, f=fi;
+  if(e.key==='Tab'){ f=fi+(e.shiftKey?-1:1);
+    if(f>=nf){ f=0; r=ri+1; } if(f<0){ f=nf-1; r=ri-1; }
+  } else { r=ri+(e.shiftKey?-1:1); }
+  if(r<0||r>=rows.length) return;   // let Tab leave the grid naturally at the edges
+  e.preventDefault();
+  window._elxEditing=true;
+  focusCell(r,f);
+}
+function _elxUpdateTotals(idx){
+  const load=(window._elxLoads||[])[idx]; if(!load) return;
+  const rows=load.rows||[];
+  const tp=rows.reduce(function(s,r){return s+(parseFloat(r.pcs)||0);},0);
+  const tw=rows.reduce(function(s,r){return s+(r.net===''?0:(parseFloat(r.net)||0));},0);
+  const tg=rows.reduce(function(s,r){return s+(r.gross===''?0:(parseFloat(r.gross)||0));},0);
+  const set=function(id,v){ const el=document.getElementById(id); if(el) el.textContent=v.toLocaleString(); };
+  set('elx-tot-pcs-'+idx,tp); set('elx-tot-wt-'+idx,tw); set('elx-tot-gr-'+idx,tg); set('elx-hdrpcs-'+idx,tp);
+}
+function _elxAddRow(idx, ri){
+  const load=(window._elxLoads||[])[idx]; if(!load) return; load.rows=load.rows||[];
+  const at=(typeof ri==='number'?ri+1:load.rows.length);
+  load.rows.splice(at,0,{ sku:'', productId:'', lot:'', pcs:'', net:'', gross:'', unknownSku:false, manual:true });
+  _elxEdiSave(); showElxEdi();
+  if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+idx);
+  setTimeout(function(){ const el=document.getElementById('elx-sku-'+idx+'-'+at); if(el) el.focus(); }, 0);
+}
+function _elxSetOrder(idx, val){ const load=(window._elxLoads||[])[idx]; if(!load) return; load.order=val; try{ _elxEdiSave(); }catch(e){} }
+function _elxNewOrder(){
+  window._elxLoads = window._elxLoads || [];
+  const load = { order:'', po:'', source:'delbravo',
+    header:{ receiver:'', invoice:'', truck:'' },
+    rows:[{ sku:'', productId:'', lot:'', po:'', cases:'', expDate:'', cpp:'', net:'', gross:'', unknownSku:false }],
+    recon:{ palletQty:0, estPallets:0 }, createdAt:Date.now(), manual:true };
+  window._elxLoads.push(load);
+  const idx=window._elxLoads.length-1;
+  try{ _elxEdiSave(); }catch(e){}
+  showElxEdi();
+  if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+idx);
+  setTimeout(function(){ const el=document.getElementById('elx-db-sku-'+idx+'-0'); if(el) el.focus(); }, 10);
+  try{ showAlert('✓ New blank order added — fill in the details, then Split by PO.','success'); }catch(e){}
+}
+function renderElxLoads(){
+  const host = document.getElementById('edi-load-list');
+  if (!host) return;
+  const loads = window._elxLoads || [];
+  const summaryHtml = window._elxSummary ? _elxRenderSummary(window._elxSummary) : '';
+  if (!loads.length && !summaryHtml){
+    host.innerHTML = '<div class="alert alert-info">No loads built yet. Import the source file, enter an <b>Order #</b> (Pedido) or <b>PO #</b> and click <b>Search</b> to build an EDI load. Each pallet becomes one line; weights come from the SKU master. Everything is editable before Export.</div>';
+    return;
+  }
+  const G='#2e7d32';
+  const loadsHtml = loads.map(function(load, idx){
+    if(load.source==='delbravo') return _elxRenderDelBravo(idx, load);
+    const rows = load.rows || [];
+    const detailId = 'elx-detail-'+idx;
+    const unknown = rows.filter(function(r){return r.unknownSku;}).length;
+    const H = load.header||{};
+    const hin = function(key,label,val){ return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:9px;letter-spacing:1px;font-weight:700;color:var(--text2);text-transform:uppercase">'+label+'</label>'
+      +'<input id="elx-hdr-'+key+'-'+idx+'" value="'+String(val==null?'':val).replace(/"/g,'&quot;')+'" oninput="_elxHdr('+idx+',&quot;'+key+'&quot;,this.value.toUpperCase())" style="padding:4px 7px;border:1.5px solid #2e7d32;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:700;background:var(--bg);color:var(--text);text-transform:uppercase;outline:none;width:120px"></div>'; };
+    const totPcs = rows.reduce(function(s,r){return s+(parseFloat(r.pcs)||0);},0).toLocaleString();
+    const totWt  = rows.reduce(function(s,r){return s+(r.net===''?0:(parseFloat(r.net)||0));},0).toLocaleString();
+    const totGr  = rows.reduce(function(s,r){return s+(r.gross===''?0:(parseFloat(r.gross)||0));},0).toLocaleString();
+    const drows = rows.map(function(r, ri){
+      const bg = ri%2!==0 ? 'rgba(0,0,0,0.03)' : '';
+      const skuBg = r.unknownSku ? ';background:rgba(185,28,28,0.10)' : '';
+      const skuTitle = r.unknownSku ? ' title="SKU not in master — enter weight manually"' : '';
+      return '<tr style="background:'+bg+';border-bottom:1px solid var(--border)">'
+        +'<td style="padding:3px 6px'+skuBg+'"'+skuTitle+'>'+_elxCell(idx,ri,'sku',r.sku,{width:'90px'})+'</td>'
+        +'<td style="padding:3px 6px">'+_elxCell(idx,ri,'productId',r.productId,{width:'170px'})+'</td>'
+        +'<td style="padding:3px 6px">'+_elxCell(idx,ri,'lot',r.lot,{width:'110px'})+'</td>'
+        +'<td style="padding:3px 6px">'+_elxCell(idx,ri,'pcs',r.pcs,{num:true})+'</td>'
+        +'<td style="padding:3px 6px">'+_elxCell(idx,ri,'net',r.net,{num:true})+'</td>'
+        +'<td style="padding:3px 6px">'+_elxCell(idx,ri,'gross',r.gross,{num:true})+'</td>'
+        +'<td style="padding:3px 6px;text-align:center;white-space:nowrap">'
+          +'<button onclick="_elxDeleteRow('+idx+','+ri+')" tabindex="-1" title="Delete line" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button>'
+        +'</td></tr>';
+    }).join('');
+    return '<div class="ticket-form" style="margin-bottom:10px;padding:0;overflow:hidden">'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface)">'
+        +'<div style="width:215px;flex:none"><div style="font-weight:bold;color:'+G+';font-size:13px;white-space:nowrap">Electrolit · Order '+(load.order||'—')+'</div>'
+          +'<div style="font-size:10px;color:'+((unknown||load.multiPo||load.source==='pdf')?'var(--warning)':'var(--text2)')+'">'+rows.length+' lines'+(unknown?(' · ⚠ '+unknown+' unknown SKU'):'')+(load.multiPo?(' · ⚠ '+load.pos.length+' POs'):'')+(load.source==='pdf'?(' · 📄 PDF'+(load.recon&&load.recon.palletQty&&load.recon.detected<load.recon.palletQty?(' · read '+load.recon.detected+'/'+load.recon.palletQty+' — verify LOTs'):' · verify LOTs')):((!unknown&&!load.multiPo)?' · reconciled':''))+'</div></div>'
+        +'<div style="display:flex;gap:6px;flex:none">'+hin('receiver','Receiver',H.receiver)
+          +'<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:9px;letter-spacing:1px;font-weight:700;color:var(--text2);text-transform:uppercase">PO #</label>'
+          +'<input id="elx-po-'+idx+'" value="'+String(load.po==null?'':load.po).replace(/"/g,'&quot;')+'" oninput="_elxSetPo('+idx+',this.value.toUpperCase())" style="padding:4px 7px;border:1.5px solid #2e7d32;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:700;background:var(--bg);color:var(--text);text-transform:uppercase;outline:none;width:120px"></div>'
+          +hin('invoice','Invoice #',H.invoice)+hin('truck','Truck #',H.truck)+'</div>'
+        +'<div style="flex:1;min-width:12px"></div>'
+        +'<div style="text-align:right;white-space:nowrap;width:72px;flex:none"><div id="elx-hdrpcs-'+idx+'" style="font-weight:bold;color:'+G+';font-size:13px">'+totPcs+'</div><div style="font-size:10px;color:var(--text2)">pcs</div></div>'
+        +'<button onclick="_elxAddRow('+idx+')" title="Add a blank line to this load" style="background:none;border:1.5px solid '+G+';color:'+G+';border-radius:5px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:700">+ Add Line</button>'
+        +'<button onclick="_elxExport('+idx+')" style="background:'+G+';color:#fff;border:none;border-radius:5px;padding:5px 14px;cursor:pointer;font-size:11px;font-weight:700">Export</button>'
+        +'<button onclick="_elxDeleteLoad('+idx+')" title="Remove load" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>'
+        +'<button id="'+detailId+'-btn" onclick="_elxToggleEDIDetail(&quot;'+detailId+'&quot;)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px;padding:2px 8px">▼</button>'
+      +'</div>'
+      +'<div id="'+detailId+'" style="display:none;border-top:1px solid var(--border);overflow-x:auto;max-height:360px;overflow-y:auto">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:var(--surface2)">'
+          +'<th style="padding:5px 8px;text-align:left;color:var(--text2)">SKU</th><th style="padding:5px 8px;text-align:left;color:var(--text2)">PRODUCT ID</th>'
+          +'<th style="padding:5px 8px;text-align:left;color:var(--text2)">LOT #</th><th style="padding:5px 8px;text-align:left;color:var(--text2)">PCS (CASES)</th>'
+          +'<th style="padding:5px 8px;text-align:left;color:var(--text2)">WEIGHT (LB)</th><th style="padding:5px 8px;text-align:left;color:var(--text2)">GROSS (LB)</th><th style="padding:5px 8px;width:28px"></th>'
+        +'</tr></thead><tbody>'+drows
+        +'<tr style="background:rgba(46,125,50,0.08);font-weight:bold"><td colspan="3" style="padding:5px 8px;color:'+G+'">TOTAL — '+rows.length+' lines · 1 pallet each</td>'
+        +'<td style="padding:5px 8px;color:'+G+'" id="elx-tot-pcs-'+idx+'">'+totPcs+'</td><td style="padding:5px 8px;color:'+G+'" id="elx-tot-wt-'+idx+'">'+totWt+'</td><td style="padding:5px 8px;color:'+G+'" id="elx-tot-gr-'+idx+'">'+totGr+'</td><td></td></tr></tbody></table>'
+      +'</div></div>';
+  }).join('');
+  host.innerHTML = summaryHtml + loadsHtml;
+}
+
+// ═══ ELECTROLIT · DEL BRAVO HOUSE BILL OF LADING (multi-PO) ══════════════════
+// Additive PDF path: a Del Bravo BOL lists several lot lines, each with its own
+// #Inv/#Fac (= PO). It imports as ONE editable *staging* load (one row per BOL
+// line: SKU · Lot · PO(#Inv) · Cases · Exp). You verify the lines, then "Split by
+// PO" explodes each line into pallets (Cases ÷ cases-per-pallet from the master)
+// and builds one normal Electrolit load per PO — sharing the header attributes
+// (Order #, Truck, Receiver). The existing Source Logistics BOL path is untouched.
+
+// Detect a Del Bravo BOL (digital text layer first; OCR page 1 only if scanned).
+async function _elxIsDelBravo(buf){
+  try{
+    const pdfjsLib=await _elxEnsurePdfJs();
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+    const tc=await (await pdf.getPage(1)).getTextContent();
+    const txt=tc.items.map(function(it){return it.str;}).join(' ');
+    const KW=/DEL BRAVO|HOUSE BILL OF LADING|CADUCIDAD|#\s*Fac|Peso Tarimas|Cantidad|Tipo de bulto/i;
+    if(txt.trim()) return KW.test(txt);
+    // scanned — quick page-1 OCR at a few orientations
+    const worker=await _elxEdiTimeout(ediEnsureTesseract(),120000,'OCR engine load');
+    const page=await pdf.getPage(1);
+    for(const rot of [0,90,270,180]){
+      const vp=page.getViewport({scale:1.6,rotation:rot});
+      const cv=document.createElement('canvas'); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height);
+      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      try{ const d=await worker.recognize(cv); const t=(d&&d.data&&d.data.text)||''; if(KW.test(t)) return true; if(/\bVersion\b|Pallet\s*Qty|Total\s*Cases/i.test(t)) return false; }catch(e){}
+    }
+    return false;
+  }catch(e){ return false; }
+}
+// Route a dropped PDF: Del Bravo -> staging importer; otherwise the existing BOL path.
+async function _elxRoutePdf(f){
+  let db=false;
+  try{ db=await _elxIsDelBravo(await f.arrayBuffer()); }catch(e){}
+  if(db){ return _elxDelBravoImport(await f.arrayBuffer(), f.name); }
+  return _elxImportPdf(f);
+}
+// OCR every page to text lines, auto-correcting a sideways/upside-down scan.
+async function _elxDelBravoOcr(buf){
+  const pdfjsLib=await _elxEnsurePdfJs();
+  const worker=await _elxEdiTimeout(ediEnsureTesseract(),120000,'OCR engine load');
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const N=pdf.numPages||1; const allLines=[];
+  const canvasAt=async function(page,scale){ const vp=page.getViewport({scale:scale}); const cv=document.createElement('canvas'); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height); await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; return cv; };
+  const recFull=async function(cv){ try{ return (await worker.recognize(cv,{},{tsv:true,blocks:true})).data; }catch(e){ return null; } };
+  const hasT=function(ws){ return ws.some(function(w){ return /^40\d{5}$/.test(w.s)||/CASES/i.test(w.s)||/CADUCIDAD|LADING|Cantidad/i.test(w.s); }); };
+  for(let i=1;i<=N;i++){
+    showAlert('Del Bravo BOL OCR — page '+i+' of '+N+'…','info');
+    let base=await canvasAt(await pdf.getPage(i),3);
+    let words=_elxWordsFromOcr(await recFull(_elxBinarize(base,185)));
+    if(!hasT(words)){ const cand=[90,270,180]; for(let a=0;a<cand.length;a++){ const rb=_elxRotateCanvas(base,cand[a]); const rw=_elxWordsFromOcr(await recFull(_elxBinarize(rb,185))); if(hasT(rw)){ base=rb; words=rw; break; } } }
+    _elxOcrLines(words).forEach(function(l){ allLines.push(l); });
+  }
+  return allLines;
+}
+// Parse Del Bravo text lines -> header + line items (best-effort; user verifies).
+function _elxDelBravoParse(lines){
+  const blob=(lines||[]).join('\n');
+  function f(re){ const m=blob.match(re); return m?m[1]:''; }
+  const order = f(/ORDER\s*#\s*(\d{4,})/i) || f(/Order\s*Number[^0-9]{0,10}(\d{4,})/i) || f(/BOL\s*#?\s*(\d{4,})/i);
+  const truck = f(/Trailer\s*(?:No\.?)?[^0-9A-Za-z]{0,6}([A-Za-z0-9]{3,})/i);
+  const palletQty = parseInt(f(/(?:Quantity of\s*pale?ts|Cantidad de\s*tarimas)[^0-9]{0,8}(\d{1,4})/i)||'0',10)||0;
+  const items=[];
+  (lines||[]).forEach(function(l){
+    const im=String(l).match(/\b(40\d{5})\b/); if(!im) return;
+    const snap=_elxSnapSku(im[1]);
+    const exp=(l.match(/\b(\d{2}\/\d{2}\/\d{2,4})\b/)||[])[1]||'';
+    // #Inv / #Fac: an 8-digit token (not the 12-digit barcode, not the 7-digit item#)
+    let inv=''; const invm=l.match(/\b(\d{8})\b/g); if(invm){ inv=invm.find(function(x){return x!==im[1];})||invm[0]; }
+    // Lot: an alphanumeric token with an interior letter (e.g. D26J729B)
+    let lot=''; const lm=l.match(/\b([A-Z]?\d{2}[A-Z]\d{3,4}[A-Z]?)\b/i); if(lm) lot=lm[1].toUpperCase();
+    // Cases (Cantidad): the number printed right after "CASES"
+    let cases=0; const cm=l.match(/CASES[^0-9]*([\d,]+(?:\.\d+)?)/i); if(cm) cases=Math.round(parseFloat(cm[1].replace(/,/g,''))||0);
+    items.push({ sku:snap.sku, unknownSku:snap.unknown, lot:lot, inv:inv, cases:cases, exp:exp });
+  });
+  return { order:order, truck:truck, palletQty:palletQty, items:items };
+}
+// Build the editable staging load (one row per BOL line; NOT yet exploded).
+function _elxBuildDelBravo(parsed, fileName){
+  const rows=(parsed.items||[]).map(function(it){
+    const m=_elxMaster(it.sku);
+    return { sku:it.sku, productId:(m&&m[0])?m[0]:'', lot:it.lot, po:it.inv, cases:it.cases,
+             expDate:it.exp, cpp:(m&&m[3]!=null)?m[3]:'', net:(m&&m[1]!=null)?m[1]:'', gross:(m&&m[2]!=null)?m[2]:'', unknownSku:!m };
+  });
+  let est=0; rows.forEach(function(r){ const c=parseFloat(r.cpp)||0, ca=parseFloat(r.cases)||0; if(c&&ca) est+=Math.round(ca/c); });
+  return { order:parsed.order||'', po:'', source:'delbravo',
+    header:{ receiver:'', invoice:'', truck:parsed.truck||'' },
+    rows:rows, recon:{ palletQty:parsed.palletQty||0, estPallets:est }, createdAt:0 };
+}
+async function _elxDelBravoImport(buf, fileName){
+  try{
+    showAlert('Reading Del Bravo BOL (OCR — first run downloads the engine, give it a moment)…','info');
+    const lines=await _elxDelBravoOcr(buf);
+    const parsed=_elxDelBravoParse(lines);
+    if(!parsed.items.length){ showAlert('Del Bravo: no line items (40xxxxx) found in '+fileName+' — check scan quality.','danger'); return; }
+    const load=_elxBuildDelBravo(parsed, fileName); load.fileName=fileName;
+    _elxEdiStampLoad(load); load.createdAt=Date.now();
+    window._elxLoads=window._elxLoads||[]; window._elxLoads.push(load);
+    _elxEdiSave(); showElxEdi();
+    if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+(window._elxLoads.length-1));
+    const pos=[]; parsed.items.forEach(function(it){ const p=String(it.inv||'').trim(); if(p&&pos.indexOf(p)<0)pos.push(p); });
+    showAlert('✓ Del Bravo BOL '+fileName+' · Order '+(parsed.order||'?')+' — '+parsed.items.length+' line(s) · ~'+load.recon.estPallets+' pallets'+(parsed.palletQty?(' (printed '+parsed.palletQty+')'):'')+' · '+pos.length+' PO(s). ⚠ Verify PO#, Lot & Cases, then Split by PO.','warning');
+  }catch(err){ console.error(err); showAlert('Del Bravo OCR failed — '+((err&&err.message)||err),'danger'); }
+}
+// Per-row PO / Cases edits on the staging load (persist to model; no re-render jump).
+function _elxDbSet(idx, ri, field, val){
+  const load=(window._elxLoads||[])[idx]; if(!load||!load.rows||!load.rows[ri]) return;
+  const r=load.rows[ri];
+  r[field] = (field==='cases') ? (_elxEdiNum(val)===''?'':(parseFloat(String(val).replace(/,/g,''))||0)) : val;
+  // On SKU entry, pull Product ID + weights from the master (model only — the display
+  // refreshes on blur via onchange, so typing is never interrupted mid-keystroke).
+  if(field==='sku'){ const m=_elxMaster(String(val==null?'':val).trim());
+    r.unknownSku=!m; r.productId=(m&&m[0])?m[0]:''; r.cpp=(m&&m[3]!=null)?m[3]:''; r.net=(m&&m[1]!=null)?m[1]:''; r.gross=(m&&m[2]!=null)?m[2]:''; }
+  if(field==='lot') _elxStampExp(r);
+  try{ _elxEdiSave(); }catch(e){}
+}
+// Refresh the staging display (Product ID / Pallets / Split count) after an edit
+// commits (blur), without interrupting typing. Guarded so it only fires for staging.
+const _ELX_DB_FIELDS=['sku','productId','lot','po','cases','expDate'];
+function _elxDbKey(e, idx, ri, field){
+  if(e.key!=='Tab' && e.key!=='Enter') return;
+  const load=(window._elxLoads||[])[idx]; if(!load) return;
+  const rows=load.rows||[]; const F=_ELX_DB_FIELDS; const nf=F.length;
+  const fi=F.indexOf(field); if(fi<0) return;
+  // Auto-populate the master-derived Product ID (set on the model by _elxDbSet) into its cell
+  // in place, so it fills without the full re-render that would interrupt tabbing.
+  const _cur=rows[ri];
+  if(_cur){ const _pe=document.getElementById('elx-db-productId-'+idx+'-'+ri);
+    if(_pe && _cur.productId!=null && _pe.value!==String(_cur.productId)) _pe.value=_cur.productId; }
+  let r=ri, f=fi;
+  if(e.key==='Tab'){ f=fi+(e.shiftKey?-1:1); if(f>=nf){f=0;r=ri+1;} if(f<0){f=nf-1;r=ri-1;} }
+  else { r=ri+(e.shiftKey?-1:1); }
+  if(r<0||r>=rows.length) return;           // let Tab leave the grid naturally at the edges
+  e.preventDefault();
+  window._elxEditing=true; window._elxDbSkipRefresh=true;   // don't re-render/steal focus mid-tab
+  const t=document.getElementById('elx-db-'+F[f]+'-'+idx+'-'+r);
+  if(t){ t.focus(); if(t.select) t.select(); }
+  window._elxDbSkipRefresh=false;
+}
+function _elxDbRefresh(idx){ if(window._elxDbSkipRefresh) return; const load=(window._elxLoads||[])[idx]; if(!load||load.source!=='delbravo') return; showElxEdi(); if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+idx); }
+function _elxDbAddRow(idx){
+  const load=(window._elxLoads||[])[idx]; if(!load||load.source!=='delbravo') return; load.rows=load.rows||[];
+  load.rows.push({ sku:'', productId:'', lot:'', po:'', cases:'', expDate:'', cpp:'', net:'', gross:'', unknownSku:false });
+  _elxEdiSave(); showElxEdi(); if(typeof _elxEdiReopenDetail==='function') _elxEdiReopenDetail('elx-detail-'+idx);
+}
+// Split the staging load into one normal Electrolit load per PO (#Inv), exploding
+// each line's Cases into pallets. Shared header attributes carry to every load.
+function _elxDelBravoSplit(idx){
+  const load=(window._elxLoads||[])[idx]; if(!load||load.source!=='delbravo') return;
+  const H=load.header||{};
+  const groups={}, order=[];
+  (load.rows||[]).forEach(function(r){ const p=String(r.po||'').trim()||'(no PO)'; if(!(p in groups)){ groups[p]=[]; order.push(p); } groups[p].push(r); });
+  if(!order.length){ showAlert('Del Bravo: nothing to split.','warning'); return; }
+  const newLoads=order.map(function(p){
+    const lines=[];
+    groups[p].forEach(function(r){
+      const m=_elxMaster(r.sku); const cpp=parseFloat(r.cpp)||(m&&m[3])||0; const ca=parseFloat(r.cases)||0;
+      const n=(cpp&&ca)?Math.round(ca/cpp):0;
+      const line={ sku:r.sku, productId:r.productId||((m&&m[0])?m[0]:''), lot:r.lot,
+        pcs:(cpp||''), net:(r.net===''?'':r.net), gross:(r.gross===''?'':r.gross), expDate:r.expDate||'', unknownSku:!m };
+      _elxStampExp(line);
+      const reps=n>0?n:1;                          // at least one line if cases/master missing
+      for(let k=0;k<reps;k++) lines.push(Object.assign({}, line));
+    });
+    return { order:load.order||'', po:(p==='(no PO)'?'':p), multiPo:false, pos:(p==='(no PO)'?[]:[p]),
+      header:{ receiver:H.receiver||'', invoice:H.invoice||'', truck:H.truck||'' },
+      rows:lines, source:'pdf', recon:{ palletQty:lines.length, detected:lines.length }, createdAt:Date.now() };
+  });
+  newLoads.forEach(_elxEdiStampLoad);
+  Array.prototype.splice.apply(window._elxLoads, [idx,1].concat(newLoads));
+  _elxEdiSave(); showElxEdi();
+  const totalP=newLoads.reduce(function(s,l){return s+l.rows.length;},0);
+  showAlert('✓ Split into '+newLoads.length+' load(s) by PO ('+order.filter(function(p){return p!=='(no PO)';}).join(', ')+') · '+totalP+' pallets total.','success');
+}
+// Dedicated render for a Del Bravo staging load (line items + Split by PO).
+function _elxRenderDelBravo(idx, load){
+  const G='#2e7d32'; const rows=load.rows||[]; const H=load.header||{}; const detailId='elx-detail-'+idx;
+  const hin=function(key,label,val){ return '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:9px;letter-spacing:1px;font-weight:700;color:var(--text2);text-transform:uppercase">'+label+'</label>'
+    +'<input id="elx-hdr-'+key+'-'+idx+'" value="'+String(val==null?'':val).replace(/"/g,'&quot;')+'" oninput="_elxHdr('+idx+',&quot;'+key+'&quot;,this.value.toUpperCase())" style="padding:4px 7px;border:1.5px solid '+G+';border-radius:6px;font-family:var(--font);font-size:11px;font-weight:700;background:var(--bg);color:var(--text);text-transform:uppercase;outline:none;width:120px"></div>'; };
+  const pos=[]; rows.forEach(function(r){ const p=String(r.po||'').trim(); if(p&&pos.indexOf(p)<0)pos.push(p); });
+  let est=0; rows.forEach(function(r){ const c=parseFloat(r.cpp)||0, ca=parseFloat(r.cases)||0; if(c&&ca) est+=Math.round(ca/c); });
+  const printed=(load.recon&&load.recon.palletQty)||0;
+  const mismatch=printed && est!==printed;
+  const cell=function(ri,field,val,opts){ opts=opts||{}; const esc=String(val==null?'':val).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    // id starts with "elx-" and sets window._elxEditing so the Firebase echo does NOT
+    // re-render mid-edit (otherwise a keystroke interrupts typing and truncates the PO).
+    return '<input id="elx-db-'+field+'-'+idx+'-'+ri+'" value="'+esc+'" oninput="_elxDbSet('+idx+','+ri+',\''+field+'\',this.value.toUpperCase())" onchange="_elxDbRefresh('+idx+')" onkeydown="_elxDbKey(event,'+idx+','+ri+',\''+field+'\')" onfocus="window._elxEditing=true" onblur="_elxCellBlur()" spellcheck="false" autocomplete="off" style="width:'+(opts.width||'100%')+';box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 5px;color:var(--text);font-family:var(--font);font-size:10px;text-transform:uppercase;text-align:'+(opts.num?'right':'left')+';outline:none">'; };
+  const drows=rows.map(function(r, ri){
+    const bg=ri%2!==0?'rgba(0,0,0,0.03)':''; const skuBg=r.unknownSku?';background:rgba(185,28,28,0.10)':'';
+    const cpp=parseFloat(r.cpp)||0, ca=parseFloat(r.cases)||0; const pl=(cpp&&ca)?Math.round(ca/cpp):0;
+    return '<tr style="background:'+bg+';border-bottom:1px solid var(--border)">'
+      +'<td style="padding:3px 6px'+skuBg+'">'+cell(ri,'sku',r.sku,{width:'80px'})+'</td>'
+      +'<td style="padding:3px 6px">'+cell(ri,'productId',r.productId,{width:'160px'})+'</td>'
+      +'<td style="padding:3px 6px">'+cell(ri,'lot',r.lot,{width:'100px'})+'</td>'
+      +'<td style="padding:3px 6px">'+cell(ri,'po',r.po,{width:'100px'})+'</td>'
+      +'<td style="padding:3px 6px;text-align:center">'+cell(ri,'cases',r.cases,{num:true,width:'70px'})+'</td>'
+      +'<td style="padding:3px 6px;text-align:center;color:var(--text2)">'+(pl||'—')+'</td>'
+      +'<td style="padding:3px 6px;text-align:center">'+cell(ri,'expDate',r.expDate,{width:'90px'})+'</td>'
+      +'<td style="padding:3px 6px;text-align:center"><button onclick="_elxDeleteRow('+idx+','+ri+')" tabindex="-1" title="Delete line" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;padding:0 3px">✕</button></td></tr>';
+  }).join('');
+  return '<div class="ticket-form" style="margin-bottom:10px;padding:0;overflow:hidden;border:1.5px solid '+G+'">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:190px"><div style="font-weight:bold;color:'+G+';font-size:13px;white-space:nowrap">Del Bravo BOL · Order '+(load.manual?('<input id="elx-dborder-'+idx+'" value="'+String(load.order==null?'':load.order).replace(/"/g,'&quot;')+'" oninput="_elxSetOrder('+idx+',this.value.toUpperCase())" placeholder="Order #" style="display:inline-block;width:130px;font-family:var(--font);font-size:13px;font-weight:bold;color:'+G+';background:transparent;border:none;border-bottom:1px dashed '+G+';padding:0 2px;outline:none;text-transform:uppercase;vertical-align:baseline">'):(load.order||'—'))+'</div>'
+        +'<div style="font-size:10px;color:var(--warning)">📄 staging · '+rows.length+' line(s) · '+pos.length+' PO(s) · ~'+est+' pallets'+(printed?(' / printed '+printed+(mismatch?' ⚠':' ✓')):'')+' — verify then Split</div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+hin('receiver','Receiver',H.receiver)+hin('truck','Truck #',H.truck)+'</div>'
+      +'<button onclick="_elxDbAddRow('+idx+')" title="Add a blank line" style="background:none;border:1.5px solid '+G+';color:'+G+';border-radius:5px;padding:6px 12px;cursor:pointer;font-size:11px;font-weight:700">+ Add Line</button>'
+      +'<button onclick="_elxDelBravoSplit('+idx+')" title="Create one Electrolit load per PO" style="background:'+G+';color:#fff;border:none;border-radius:5px;padding:6px 14px;cursor:pointer;font-size:11px;font-weight:700">Split by PO ('+pos.length+')</button>'
+      +'<button onclick="_elxDeleteLoad('+idx+')" title="Remove" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:2px 4px">✕</button>'
+      +'<button id="'+detailId+'-btn" onclick="_elxToggleEDIDetail(&quot;'+detailId+'&quot;)" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);cursor:pointer;font-size:11px;padding:2px 8px">▼</button>'
+    +'</div>'
+    +'<div id="'+detailId+'" style="display:block;border-top:1px solid var(--border);overflow-x:auto;max-height:360px;overflow-y:auto">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:var(--surface2)">'
+        +'<th style="padding:5px 6px;text-align:left;color:var(--text2)">SKU</th><th style="padding:5px 6px;text-align:left;color:var(--text2)">PRODUCT ID</th>'
+        +'<th style="padding:5px 6px;text-align:left;color:var(--text2)">LOT #</th><th style="padding:5px 6px;text-align:left;color:var(--text2)">PO # (#Inv)</th>'
+        +'<th style="padding:5px 6px;text-align:center;color:var(--text2)">CASES</th><th style="padding:5px 6px;text-align:center;color:var(--text2)">PALLETS</th>'
+        +'<th style="padding:5px 6px;text-align:center;color:var(--text2)">EXP DATE</th><th style="width:24px"></th>'
+      +'</tr></thead><tbody>'+drows+'</tbody></table>'
+    +'</div></div>';
+}
+// ═══ END EDI SUBSYSTEM ════════════════════════════════════════════════════════
+
+
+// ════════════════ ELECTROLIT · MANUAL INBOUND (master-driven receipt builder) ════════════════
+// A guided manual inbound for Electrolit, modeled on the IPG / Nexus "Manual New Inbound" but
+// driven by the embedded ELX_MASTER: fill a header (Receiver / PO / Invoice / Truck / Order # /
+// Exp Date), add SKU lines whose Description, Net/Gross weight and Cases-per-pallet auto-fill
+// from the master, enter a pallet Qty per SKU, and it generates ONE ROW PER PALLET and drops a
+// normal Electrolit load into the EDI Inbound list (fully editable + Export there, exactly like
+// a dragged / searched load). Uses only the isolated Electrolit EDI persistence (_elxEdiSave),
+// so it shares nothing with 6021's existing EDI system.
+function _elmSerialFromDate(v){
+  if(!v) return null; const p=String(v).split('-'); if(p.length!==3) return null;
+  const d=Date.UTC(+p[0],+p[1]-1,+p[2]); if(isNaN(d)) return null;
+  return Math.round(d/86400000)+25569;
+}
+function _elmBlankLine(){ return { sku:'', desc:'', cpp:'', qty:'', net:'', gross:'', unknownSku:false }; }
+function _elmNum(v){ if(v===''||v==null) return ''; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?'':n; }
+function showElxManual(){
+  window._elmLines = (window._elmLines && window._elmLines.length) ? window._elmLines : [_elmBlankLine()];
+  const opts = Object.keys(ELX_MASTER).sort().map(function(sku){
+    const m=ELX_MASTER[sku]; const d=(m&&m[0])?String(m[0]).replace(/"/g,'&quot;'):'';
+    return '<option value="'+sku+'">'+sku+' — '+d+'</option>';
+  }).join('');
+  const inp='background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-family:var(--font);font-size:12px;outline:none;width:100%';
+  const lbl='display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:4px';
+  document.getElementById('modal-container').innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:1040px;max-width:97vw">
+      <datalist id="elm-sku-list">${opts}</datalist>
+      <h2>📥 ELECTROLIT · MANUAL INBOUND</h2>
+      <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden">
+        <div style="padding:9px 13px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:bold">Inbound Header</div>
+        <div style="padding:14px;display:grid;gap:12px;grid-template-columns:repeat(3,1fr)">
+          <div><label style="${lbl}">Initial Receiver</label><input id="elm-receiver" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. LEXY" style="${inp}"></div>
+          <div><label style="${lbl}">PO #</label><input id="elm-po" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. 60045382" style="${inp}"></div>
+          <div><label style="${lbl}">Invoice #</label><input id="elm-invoice" oninput="this.value=this.value.toUpperCase()" placeholder="invoice #" style="${inp}"></div>
+          <div><label style="${lbl}">Truck #</label><input id="elm-truck" oninput="this.value=this.value.toUpperCase()" placeholder="truck / trailer" style="${inp}"></div>
+          <div><label style="${lbl}">Piper Order #</label><input id="elm-order" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. 10032235" style="${inp}"></div>
+          <div><label style="${lbl}">Exp Date (FEFO)</label><input id="elm-exp" type="date" style="${inp}"></div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden">
+        <div style="padding:9px 13px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:bold">SKU Lines</span>
+          <span style="font-size:10px;color:var(--text2)">Qty = pallets · one row per pallet · weights from master</span>
+          <span style="flex:1"></span>
+          <label style="font-size:11px;color:var(--text2);display:inline-flex;align-items:center;gap:5px;cursor:pointer" title="Auto-fill each pallet's Lot # as PO# + sequence (e.g. 60045382-001).">
+            <input type="checkbox" id="elm-gen-lot" style="margin:0;cursor:pointer"> Generate Lot #
+          </label>
+        </div>
+        <div style="padding:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn btn-sm btn-primary" onclick="elmAddLine()">+ Add SKU Line</button>
+            <button class="btn btn-sm" onclick="elmClearLines()">Clear Lines</button>
+          </div>
+          <div style="overflow:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr>
+                <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;letter-spacing:.5px;color:var(--text2);text-transform:uppercase">SKU *</th>
+                <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;letter-spacing:.5px;color:var(--text2);text-transform:uppercase">Description (auto)</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;letter-spacing:.5px;color:var(--text2);text-transform:uppercase">Cases/Plt</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;letter-spacing:.5px;color:var(--text2);text-transform:uppercase">Qty (plts) *</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;letter-spacing:.5px;color:var(--text2);text-transform:uppercase">Net Wt</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:10px;letter-spacing:.5px;color:var(--text2);text-transform:uppercase">Gross Wt</th>
+                <th style="border-bottom:2px solid var(--border)"></th>
+              </tr></thead>
+              <tbody id="elm-lines"></tbody>
+            </table>
+          </div>
+          <div style="background:rgba(46,125,50,0.07);border:1px solid rgba(46,125,50,0.3);border-left:3px solid #2e7d32;border-radius:6px;padding:8px 11px;font-size:11px;color:var(--text2);margin-top:12px">
+            Type or pick a SKU (auto-completes from the Electrolit master) and Description, Cases/Pallet and weights fill in from the master. For a SKU not in the master, enter the weights by hand. Each pallet generates one export line; the Exp Date drives FEFO picking once the load is received.
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:12px">
+        <div><b id="elm-sum-lines" style="font-size:18px;color:#2e7d32;display:block">0</b><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text2)">SKU Lines</span></div>
+        <div><b id="elm-sum-plts" style="font-size:18px;color:#2e7d32;display:block">0</b><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text2)">Pallets</span></div>
+        <div><b id="elm-sum-cases" style="font-size:18px;color:#2e7d32;display:block">0</b><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text2)">Cases</span></div>
+        <div><b id="elm-sum-wt" style="font-size:18px;color:#2e7d32;display:block">0</b><span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text2)">Gross Wt (lbs)</span></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">Close</button>
+        <button class="btn btn-success" onclick="elmCommit()">Add to EDI Loads →</button>
+      </div>
+    </div>
+  </div>`;
+  elmRenderLines();
+}
+function elmAddLine(){ window._elmLines=window._elmLines||[]; window._elmLines.push(_elmBlankLine()); elmRenderLines(); }
+function elmClearLines(){ window._elmLines=[_elmBlankLine()]; elmRenderLines(); }
+function elmRemoveLine(i){ (window._elmLines||[]).splice(i,1); if(!window._elmLines.length) window._elmLines=[_elmBlankLine()]; elmRenderLines(); }
+// SKU chosen/changed → look up the master and auto-fill the rest of the row.
+function elmSku(i, val){
+  const L=(window._elmLines||[])[i]; if(!L) return;
+  L.sku=String(val||'').trim().toUpperCase();
+  const m=_elxMaster(L.sku);
+  if(m){ L.desc=m[0]||''; L.cpp=(m[3]==null?'':m[3]); L.net=(m[1]==null?'':m[1]); L.gross=(m[2]==null?'':m[2]); L.unknownSku=false; }
+  else { L.desc=''; L.unknownSku=!!L.sku; }
+  elmRenderLines();
+}
+function elmField(i, field, val){
+  const L=(window._elmLines||[])[i]; if(!L) return;
+  L[field]=(field==='qty')?String(val).replace(/[^0-9]/g,''):_elmNum(val);
+  elmSyncTotals();
+}
+function elmSyncTotals(){
+  const lines=window._elmLines||[]; let nl=0,plt=0,cs=0,wt=0;
+  lines.forEach(function(L){ const q=parseInt(L.qty)||0; if(L.sku&&q>0){ nl++; plt+=q; const cpp=parseFloat(L.cpp)||0; const g=parseFloat(L.gross)||0; cs+=q*cpp; wt+=q*g; } });
+  const set=function(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('elm-sum-lines',nl); set('elm-sum-plts',plt.toLocaleString());
+  set('elm-sum-cases',Math.round(cs).toLocaleString()); set('elm-sum-wt',Math.round(wt).toLocaleString());
+}
+function elmRenderLines(){
+  const tb=document.getElementById('elm-lines'); if(!tb) return;
+  const lines=window._elmLines||[];
+  const cellI='background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 6px;color:var(--text);font-family:var(--font);font-size:11px;outline:none';
+  if(!lines.length){ tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--text2);font-style:italic">No lines yet — click "Add SKU Line".</td></tr>'; elmSyncTotals(); return; }
+  tb.innerHTML=lines.map(function(L,i){
+    const warn=L.unknownSku?' title="SKU not in Electrolit master — enter weights by hand" style="'+cellI+';border-color:var(--warning)"':(' style="'+cellI+'"');
+    return '<tr>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2)"><input list="elm-sku-list" value="'+String(L.sku||'').replace(/"/g,'&quot;')+'" onchange="elmSku('+i+',this.value)" placeholder="40…" style="'+cellI+';width:110px"></td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2);font-size:11px;color:'+(L.unknownSku?'var(--warning)':'var(--text2)')+';max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(L.desc?String(L.desc).replace(/</g,'&lt;'):(L.unknownSku?'(not in master)':'—'))+'</td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2);text-align:right"><input value="'+(L.cpp===''?'':L.cpp)+'" oninput="elmField('+i+',\'cpp\',this.value)" style="'+cellI+';width:60px;text-align:right"></td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2);text-align:right"><input value="'+(L.qty===''?'':L.qty)+'" oninput="elmField('+i+',\'qty\',this.value)" placeholder="0" style="'+cellI+';width:60px;text-align:right"></td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2);text-align:right"><input value="'+(L.net===''?'':L.net)+'" oninput="elmField('+i+',\'net\',this.value)"'+warn+' ></td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2);text-align:right"><input value="'+(L.gross===''?'':L.gross)+'" oninput="elmField('+i+',\'gross\',this.value)" style="'+cellI+';width:80px;text-align:right"></td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid var(--surface2);text-align:center"><button onclick="elmRemoveLine('+i+')" title="Remove line" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 4px">✕</button></td>'
+      +'</tr>';
+  }).join('');
+  elmSyncTotals();
+}
+function elmCommit(){
+  const gv=function(id){ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const receiver=gv('elm-receiver'), po=gv('elm-po'), invoice=gv('elm-invoice'),
+        truck=gv('elm-truck'), order=gv('elm-order'), expRaw=gv('elm-exp');
+  const genLot=!!(document.getElementById('elm-gen-lot')||{}).checked;
+  const expSerial=_elmSerialFromDate(expRaw);
+  const lines=(window._elmLines||[]).filter(function(L){ return L.sku && (parseInt(L.qty)||0)>0; });
+  if(!lines.length){ showAlert('Add at least one SKU line with a pallet quantity.','warning'); return; }
+  if(!po && !order){ showAlert('Enter a PO # or Piper Order # for this inbound.','warning'); return; }
+  const rows=[]; let seq=1;
+  lines.forEach(function(L){
+    const qty=parseInt(L.qty)||0; const m=_elxMaster(L.sku);
+    const productId=(m&&m[0])?m[0]:(L.desc||'');
+    const cpp=(L.cpp!==''?(parseFloat(L.cpp)||0):(m?m[3]:''));
+    const net=(L.net!==''?(parseFloat(L.net)||0):(m&&m[1]!=null?m[1]:''));
+    const gross=(L.gross!==''?(parseFloat(L.gross)||0):(m&&m[2]!=null?m[2]:''));
+    for(let p=0;p<qty;p++){
+      const row={ sku:L.sku, productId:productId, lot:(genLot?((po||order||'')+'-'+String(seq).padStart(3,'0')):''),
+        pcs:(cpp===''?'':cpp), net:(net==null?'':net), gross:(gross==null?'':gross), unknownSku:!m };
+      if(expSerial) row.expSerial=expSerial;
+      rows.push(row); seq++;
+    }
+  });
+  const load={ order:order, po:po, source:'manual', manual:true, createdAt:Date.now(),
+    header:{ receiver:receiver, invoice:invoice, truck:truck }, rows:rows };
+  window._elxLoads=window._elxLoads||[]; window._elxLoads.push(load);
+  try{ _elxEdiSave(); }catch(e){}
+  window._elmLines=[_elmBlankLine()];
+  closeModal();
+  if(typeof showElxEdi==='function') showElxEdi();
+  try{ showAlert('✓ Manual inbound added — '+rows.length+' pallet line(s) across '+lines.length+' SKU(s). Review & Export in the Inbound list.','success'); }catch(e){}
+}
+// ════════════════ END ELECTROLIT MANUAL INBOUND ════════════════
+
+// ════════════════ END ELECTROLIT EDI INBOUND ════════════════
 
 // ─── EDI LOAD PERSISTENCE + SHARED SYNC ──────────────────────────────
 // EDI loads used to live only in memory, so any reload (incl. the ↻ REFRESH button,
